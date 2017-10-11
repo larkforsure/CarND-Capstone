@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 
 import rospy
-from geometry_msgs.msg import PoseStamped
-from styx_msgs.msg import Lane, Waypoint
-
+from std_msgs.msg import Int32
+from geometry_msgs.msg import PoseStamped, Pose
+from styx_msgs.msg import Lane, Waypoint, TrafficLight, TrafficLightArray
+from geometry_msgs.msg import TwistStamped
 import math
+import sys
 
 '''
 This node will publish waypoints from the car's current position to some `x` distance ahead.
@@ -30,27 +32,40 @@ class WaypointUpdater(object):
 
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
-
+        # temporary 
+        rospy.Subscriber('/vehicle/traffic_lights', TrafficLightArray, self.traffic_lights_cb)
+        
         # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
-
+        rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb)
 
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
         # TODO: Add other member variables you need below
+        self.current_pose = None
+        self.lights = None
+        self.waypoints = None
 
+        rospy.loginfo("WaypointUpdater: initialize done")
         rospy.spin()
 
-    def pose_cb(self, msg):
-        # TODO: Implement
-        pass
+    def pose_cb(self, poseStamped):
+        self.current_pose = poseStamped.pose
+        #rospy.loginfo("WaypointUpdater: Car position updated to %s", self.current_pose)
+        #self.update_waypoints()
 
-    def waypoints_cb(self, waypoints):
-        # TODO: Implement
-        pass
+    def waypoints_cb(self, lane):
+        # this only publishs once
+        rospy.loginfo("WaypointUpdater: received base waypoints %s", lane.waypoints[0]);
+        if self.waypoints is None:
+            self.waypoints = lane.waypoints
+            self.update_waypoints()
 
     def traffic_cb(self, msg):
         # TODO: Callback for /traffic_waypoint message. Implement
         pass
+
+    def traffic_lights_cb(self, msg):
+        self.lights = msg.lights
 
     def obstacle_cb(self, msg):
         # TODO: Callback for /obstacle_waypoint message. We will implement it later
@@ -70,6 +85,12 @@ class WaypointUpdater(object):
             wp1 = i
         return dist
 
+    def update_waypoints(self):
+        # construct a Lane message
+        lane = Lane()
+        lane.waypoints = self.waypoints
+        lane.header.stamp = rospy.get_rostime()
+        self.final_waypoints_pub.publish(lane)
 
 if __name__ == '__main__':
     try:

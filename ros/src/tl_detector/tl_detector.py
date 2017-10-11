@@ -2,14 +2,16 @@
 import rospy
 from std_msgs.msg import Int32
 from geometry_msgs.msg import PoseStamped, Pose
-from styx_msgs.msg import TrafficLightArray, TrafficLight
-from styx_msgs.msg import Lane
+from styx_msgs.msg import Lane, Waypoint, TrafficLight, TrafficLightArray
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 from light_classification.tl_classifier import TLClassifier
 import tf
 import cv2
 import yaml
+import math
+import time
+import numpy as np
 
 STATE_COUNT_THRESHOLD = 3
 
@@ -48,6 +50,8 @@ class TLDetector(object):
         self.last_state = TrafficLight.UNKNOWN
         self.last_wp = -1
         self.state_count = 0
+
+        rospy.loginfo("TL Detection : initialization done");
 
         rospy.spin()
 
