@@ -46,6 +46,7 @@ class WaypointUpdater(object):
         # TODO: Add other member variables you need below
         # the full track way points
         self.waypoints = None
+        self.loop_waypoints = None
         self.current_pose = None
         self.current_velocity = None
         self.last_wp_id = None
@@ -61,9 +62,12 @@ class WaypointUpdater(object):
 
     def waypoints_cb(self, lane):
         # publishes a list of all waypoints for the track and it only publishes once
-        rospy.loginfo("WaypointUpdater: received base waypoints min %s, max %s", min([ wp.pose.pose.position.x for wp in lane.waypoints]), max([ wp.pose.pose.position.x for wp in lane.waypoints]));
+        rospy.loginfo("WaypointUpdater: received base waypoints size %s, min_x %s, max_x %s", len(lane.waypoints), min([ wp.pose.pose.position.x for wp in lane.waypoints]), max([ wp.pose.pose.position.x for wp in lane.waypoints]));
         if self.waypoints is None:
             self.waypoints = lane.waypoints
+            # tricky, duplicate waypoints to deal with wrap problem
+            self.loop_waypoints = self.waypoints[:]
+            self.loop_waypoints.extend(self.loop_waypoints)
             self.update_waypoints()
 
     def current_velocity_cb(self, twistStamped):
@@ -95,7 +99,7 @@ class WaypointUpdater(object):
         return dist
 
     def update_waypoints(self):
-        if ( self.waypoints is None or self.current_velocity is None
+        if ( self.loop_waypoints is None or self.current_velocity is None
                 or self.current_pose is None ):
             return
 
@@ -103,32 +107,31 @@ class WaypointUpdater(object):
         car_x = self.current_pose.position.x
         car_y = self.current_pose.position.y
 
-        # find the waypoint in front of
-        next_id = -1
+        # find the nearest waypoint
+        min_dist = sys.maxsize
+        next_id = None
+        wp_len = len(self.waypoints)
         begin = 0 
-        end = len(self.waypoints)
+        end = wp_len # the first search shall be inside orignal waypoints
         if self.last_wp_id is not None:
-            begin = self.last_wp_id - 30
-            end = min(end, self.last_wp_id + 60)
+            begin = max(0, self.last_wp_id - 1)
+            end = min(end * 2, self.last_wp_id + 5) # search extend to duplicated loop waypoints
 
         for i in range(begin, end):
-            wp_x = self.waypoints[i].pose.pose.position.x
-            if wp_x > car_x : 
+            wp_x = self.loop_waypoints[i].pose.pose.position.x
+            wp_y = self.loop_waypoints[i].pose.pose.position.y
+            dist = (car_x - wp_x)**2 + (car_y - wp_y)**2
+            if dist < min_dist : 
+                min_dist = dist
                 next_id = i
-                break
-        
-        if next_id == -1:  # back to the starting point
-            next_id = 0
 
-        self.last_wp_id = next_id
-        rospy.loginfo("WaypointUpdater: next waypoint id %s, wp_x %s", next_id, self.waypoints[next_id].pose.pose.position.x)
+        rospy.loginfo("WaypointUpdater: next loop waypoint id %s, wp_x %s, wp_y %s", next_id, self.loop_waypoints[next_id].pose.pose.position.x, self.loop_waypoints[next_id].pose.pose.position.y)
 
         # fulfill LOOKAHEAD_WPS waypoints starting from next_id
-        # tricky, firstly duplicate waypoints
-        loop_waypoints = self.waypoints[:]
-        loop_waypoints.extend(loop_waypoints)
-        next_waypoints = loop_waypoints[next_id : next_id+LOOKAHEAD_WPS-1]
-
+        next_waypoints = self.loop_waypoints[next_id : next_id+LOOKAHEAD_WPS-1]
+        # chop back
+        self.last_wp_id = next_id if next_id < wp_len else next_id - wp_len
+        
         # construct a Lane message
         lane = Lane()
         lane.waypoints = next_waypoints
