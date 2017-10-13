@@ -24,7 +24,7 @@ TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 
 LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
 ONE_MPH = 0.44704
-MAX_SPEED = 40.0
+MAX_SPEED = 50.0
 SLOWDOWN_WPS = 50 # Number of waypoints before traffic light to start slowing down
 SLOWDOWN_DIST = 1000 # Dist before traffic light to start slowing down
 

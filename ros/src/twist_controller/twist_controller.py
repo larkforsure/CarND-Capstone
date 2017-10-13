@@ -5,7 +5,7 @@ from yaw_controller import YawController
 
 GAS_DENSITY = 2.858
 ONE_MPH = 0.44704
-MAX_SPEED = 40.0
+MAX_SPEED = 50.0
 
 class Controller(object):
     def __init__(self, wheel_base, steer_ratio, 
@@ -35,7 +35,7 @@ class Controller(object):
         ### only one of throttle & brake allowed to be non-Zero
         error = min(target_v.x, MAX_SPEED*ONE_MPH) - current_v.x
         if error < 0:
-            brake = -50.0*error
+            brake = -65.0*error
             brake = max(brake, 15.0)
             throttle = 0.0
             # reset throttle pid
@@ -44,7 +44,7 @@ class Controller(object):
             dt = rospy.get_time() - self.last_timestamp
             # PID
             throttle = self.throttle_pid.step(error, dt)
-            throttle = min(max(throttle, 0.), 1.3)
+            throttle = min(max(throttle, 0.), 1.6)
             brake = 0.0
         
         steering = self.yaw_control.get_steering(target_v.x, target_w.z, current_v.x)
