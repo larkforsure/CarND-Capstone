@@ -53,17 +53,7 @@ class DBWNode(object):
                                             ThrottleCmd, queue_size=1)
         self.brake_pub = rospy.Publisher('/vehicle/brake_cmd',
                                          BrakeCmd, queue_size=1)
-        # PID coeffients
-        throttle_coeff = [ rospy.get_param('~throttle_Kp', 0.),
-                           rospy.get_param('~throttle_Ki', 0.),
-                           rospy.get_param('~throttle_Kd', 0.),
-                         ]
-        
-        steering_coeff = [ rospy.get_param('~steering_Kp', 0.),
-                           rospy.get_param('~steering_Ki', 0.),
-                           rospy.get_param('~steering_Kd', 0.),
-                         ]
-
+                
         # TODO: Create `TwistController` object
         self.controller = Controller(  wheel_base=wheel_base, 
                                             steer_ratio=steer_ratio, 
@@ -72,9 +62,7 @@ class DBWNode(object):
                                             accel_limit=accel_limit,
                                             decel_limit=decel_limit,
                                             max_lat_accel=max_lat_accel, 
-                                            max_steer_angle=max_steer_angle,
-                                            throttle_coeff=throttle_coeff, 
-                                            steering_coeff=steering_coeff
+                                            max_steer_angle=max_steer_angle
                                             )
 
         # TODO: Subscribe to all the topics you need to

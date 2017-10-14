@@ -12,7 +12,7 @@ import numpy as np
 import yaml,math,sys
 
 STATE_COUNT_THRESHOLD = 3
-SLOWDOWN_DIST = 1500 # Dist**2 before traffic light to start slowing down
+SLOWDOWN_DIST = 3000 # Dist**2 before traffic light to start slowing down
 
 class TLDetector(object):
     def __init__(self):
@@ -177,8 +177,8 @@ class TLDetector(object):
         begin = 0
         end = wp_len # the first search shall be inside orignal waypoints
         if self.last_wp_id is not None:
-            begin = max(0, self.last_wp_id - 1)
-            end = min(end * 2, self.last_wp_id + 5) # search extend to duplicated loop waypoints
+            begin = max(0, self.last_wp_id - 2)
+            end = min(end * 2, self.last_wp_id + 8) # search extend to duplicated loop waypoints
 
         for i in range(begin, end):
             wp_x = self.loop_waypoints[i].pose.pose.position.x

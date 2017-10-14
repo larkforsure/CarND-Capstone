@@ -134,7 +134,7 @@ class WaypointUpdater(object):
         # chop back
         self.last_wp_id = next_id if next_id < wp_len else next_id - wp_len
       
-        rospy.loginfo("WaypointUpdater: car_wp_id %s, red_light_wp_id %s", self.last_wp_id, self.upcoming_red_light_wp_id)
+        #rospy.loginfo("WaypointUpdater: car_wp_id %s, red_light_wp_id %s", self.last_wp_id, self.upcoming_red_light_wp_id)
 
         
         # Adjust next_waypoints velocity
@@ -144,13 +144,13 @@ class WaypointUpdater(object):
                 self.set_waypoint_velocity(next_waypoints, i, self.max_speed) 
             else:
                 dist = self.upcoming_red_light_wp_id - self.last_wp_id
-                if abs(dist) < 8:
+                if abs(dist) < 2: # avoid divide 0, or unfortunate -1 
                     target_v = 0
                 else: 
                     if dist < 0:
                         dist = dist + wp_len
                     # Step by step decelaration
-                    target_v = max(0, car_vx - (i+8)*(car_vx/dist))
+                    target_v = max(0, car_vx - (i+1)*(car_vx/dist))
                 #rospy.loginfo("WaypointUpdater: car_vx %s, dist %s, point %s, target_v %s", car_vx, dist, i, target_v)
                 self.set_waypoint_velocity(next_waypoints, i, target_v)
 
