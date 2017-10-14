@@ -35,10 +35,11 @@ class DBWNode(object):
     def __init__(self):
         rospy.init_node('dbw_node')
 
+        max_speed = 0.447*rospy.get_param('/waypoint_loader/velocity', 40.)
         vehicle_mass = rospy.get_param('~vehicle_mass', 1736.35)
         fuel_capacity = rospy.get_param('~fuel_capacity', 13.5)
         brake_deadband = rospy.get_param('~brake_deadband', .1)
-        decel_limit = rospy.get_param('~decel_limit', -5)
+        decel_limit = rospy.get_param('~decel_limit', -1.)
         accel_limit = rospy.get_param('~accel_limit', 1.)
         wheel_radius = rospy.get_param('~wheel_radius', 0.2413)
         wheel_base = rospy.get_param('~wheel_base', 2.8498)
@@ -66,7 +67,10 @@ class DBWNode(object):
         # TODO: Create `TwistController` object
         self.controller = Controller(  wheel_base=wheel_base, 
                                             steer_ratio=steer_ratio, 
-                                            min_speed=1.0*0.447,
+                                            max_speed=max_speed,
+                                            min_speed=0.447*1.0,
+                                            accel_limit=accel_limit,
+                                            decel_limit=decel_limit,
                                             max_lat_accel=max_lat_accel, 
                                             max_steer_angle=max_steer_angle,
                                             throttle_coeff=throttle_coeff, 
@@ -83,6 +87,7 @@ class DBWNode(object):
         self.twist_cmd = None
 
         self.loop()
+
 
     def loop(self):
         rate = rospy.Rate(50) # 50Hz

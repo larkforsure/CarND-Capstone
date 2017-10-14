@@ -23,8 +23,6 @@ TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 
 LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
-ONE_MPH = 0.44704
-MAX_SPEED = 50.0
 SLOWDOWN_WPS = 50 # Number of waypoints before traffic light to start slowing down
 SLOWDOWN_DIST = 1000 # Dist before traffic light to start slowing down
 
@@ -32,6 +30,7 @@ class WaypointUpdater(object):
     def __init__(self):
         rospy.init_node('waypoint_updater')
 
+        self.max_speed = 0.447*rospy.get_param('/waypoint_loader/velocity', 40.)
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
         # temporary 
@@ -53,7 +52,6 @@ class WaypointUpdater(object):
         self.lights = None
         self.last_light_wp_id = None
 
-        rospy.loginfo("WaypointUpdater: initialize done")
         rospy.spin()
 
     def pose_cb(self, poseStamped):
@@ -84,7 +82,7 @@ class WaypointUpdater(object):
     def obstacle_cb(self, msg):
         # TODO: Callback for /obstacle_waypoint message. We will implement it later
         pass
-
+    
     def get_waypoint_velocity(self, waypoint):
         return waypoint.twist.twist.linear.x
 
@@ -162,7 +160,7 @@ class WaypointUpdater(object):
         # adjst next_waypoints velocity
         for i in range(len(next_waypoints)-1):
             if not is_red_light:
-                self.set_waypoint_velocity(next_waypoints, i, MAX_SPEED*ONE_MPH) 
+                self.set_waypoint_velocity(next_waypoints, i, self.max_speed) 
             else:
                 target_v = 0; #car_vx - (i+1)*(car_vx/len(next_waypoints)) 
                 self.set_waypoint_velocity(next_waypoints, i, target_v)
