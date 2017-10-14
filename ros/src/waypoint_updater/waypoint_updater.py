@@ -144,13 +144,13 @@ class WaypointUpdater(object):
                 self.set_waypoint_velocity(next_waypoints, i, self.max_speed) 
             else:
                 dist = self.upcoming_red_light_wp_id - self.last_wp_id
-                if abs(dist) < 2: # avoid divide 0, or unfortunate -1 
+                if abs(dist) <= 1: # avoid divide 0, or unfortunate -1 
                     target_v = 0
                 else: 
                     if dist < 0:
                         dist = dist + wp_len
                     # Step by step decelaration
-                    target_v = max(0, car_vx - (i+1)*(car_vx/dist))
+                    target_v = max(0, car_vx - (i+1)*(car_vx/(dist-1)))
                 #rospy.loginfo("WaypointUpdater: car_vx %s, dist %s, point %s, target_v %s", car_vx, dist, i, target_v)
                 self.set_waypoint_velocity(next_waypoints, i, target_v)
 

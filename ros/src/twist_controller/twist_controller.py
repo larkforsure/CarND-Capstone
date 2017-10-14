@@ -14,7 +14,7 @@ class Controller(object):
         self.decel_limit = decel_limit
         self.max_steer_angle = max_steer_angle
         self.throttle_pid = PID(2, 0.005, 0.0)
-        self.brake_pid = PID(60, 0.0, 1000.0)
+        self.brake_pid = PID(30, 0.0, 10000.0)
         self.yaw_control = YawController(wheel_base, steer_ratio,
                         min_speed, max_lat_accel, max_steer_angle)
         self.filter = LowPassFilter(0.2, 0.1)
