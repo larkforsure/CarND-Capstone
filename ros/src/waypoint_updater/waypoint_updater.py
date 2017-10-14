@@ -35,7 +35,7 @@ class WaypointUpdater(object):
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
         # temporary 
         rospy.Subscriber('/vehicle/traffic_lights', TrafficLightArray, self.lights_cb)
-        
+
         # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
         rospy.Subscriber('/traffic_waypoint', Int32, self.traffic_cb) # this is base_waypoints plus traffic lights
         rospy.Subscriber('/current_velocity', TwistStamped, self.current_velocity_cb, queue_size=1)
@@ -49,9 +49,11 @@ class WaypointUpdater(object):
         self.current_pose = None
         self.current_velocity = None
         self.last_wp_id = None
+        
+        # temporary lights nearest waypoints IDs
+        self.stop_lights_wp_ids = []
         self.lights = None
-        self.last_light_wp_id = None
-
+        
         rospy.spin()
 
     def pose_cb(self, poseStamped):
@@ -59,12 +61,12 @@ class WaypointUpdater(object):
         #rospy.loginfo("WaypointUpdater: Car position updated to %s", self.current_pose)
         self.update_waypoints()
 
+    # publishes a list of all waypoints for the track and it only publishes once
     def waypoints_cb(self, lane):
-        # publishes a list of all waypoints for the track and it only publishes once
-        rospy.loginfo("WaypointUpdater: received base waypoints size %s, min_x %s, max_x %s", len(lane.waypoints), min([ wp.pose.pose.position.x for wp in lane.waypoints]), max([ wp.pose.pose.position.x for wp in lane.waypoints]));
+        rospy.loginfo("WaypointUpdater: Received base waypoints size %s, min_x %s, max_x %s", len(lane.waypoints), min([ wp.pose.pose.position.x for wp in lane.waypoints]), max([ wp.pose.pose.position.x for wp in lane.waypoints]));
         if self.waypoints is None:
             self.waypoints = lane.waypoints
-            # tricky, duplicate waypoints to deal with wrap problem
+            # Tricky, duplicate waypoints to deal with wrap problem
             self.loop_waypoints = self.waypoints[:]
             self.loop_waypoints.extend(self.loop_waypoints)
             self.update_waypoints()
@@ -105,7 +107,7 @@ class WaypointUpdater(object):
         car_x = self.current_pose.position.x
         car_y = self.current_pose.position.y
 
-        # find the nearest waypoint
+        # Find the nearest waypoint
         min_dist = sys.maxsize
         next_id = None
         wp_len = len(self.waypoints)
@@ -125,39 +127,46 @@ class WaypointUpdater(object):
 
         #rospy.loginfo("WaypointUpdater: next loop waypoint id %s, wp_x %s, wp_y %s", next_id, self.loop_waypoints[next_id].pose.pose.position.x, self.loop_waypoints[next_id].pose.pose.position.y)
 
-        # fulfill LOOKAHEAD_WPS waypoints starting from next_id
+        # Fulfill LOOKAHEAD_WPS waypoints starting from next_id
         next_waypoints = self.loop_waypoints[next_id : next_id+LOOKAHEAD_WPS-1]
         # chop back
         self.last_wp_id = next_id if next_id < wp_len else next_id - wp_len
-       
-        # find the nearest light waypoint
-        loop_lights = self.lights[:]
-        loop_lights.extend(loop_lights)
+      
+
+        # One-time processing of lights_positions to lights nearest waypoint IDs
+        if len(self.stop_lights_wp_ids) == 0:
+            for light in self.lights:
+                wp_id = self.get_closest_waypoint(light.pose.pose)
+                self.stop_lights_wp_ids.append(wp_id)
+            rospy.loginfo("TLDetector: Generated stop lights waypoint IDs %s", self.stop_lights_wp_ids)
+            sys.stdout.flush()
+
+        # Find the nearest light
         min_dist = sys.maxsize
         next_id = None
-        wp_len = len(self.lights)
-        begin = 0 
-        end = wp_len # the first search shall be inside orignal waypoints
-        if self.last_light_wp_id is not None:
-            begin = max(0, self.last_light_wp_id - 1)
-            end = min(end * 2, self.last_light_wp_id + 5) # search extend to duplicated loop waypoints
-
-        for i in range(begin, end):
-            wp_x = loop_lights[i].pose.pose.position.x
-            wp_y = loop_lights[i].pose.pose.position.y
+        for i in range(len(self.lights)-1):
+            wp_x = self.lights[i].pose.pose.position.x
+            wp_y = self.lights[i].pose.pose.position.y
             dist = (car_x - wp_x)**2 + (car_y - wp_y)**2
             if dist < min_dist : 
                 min_dist = dist
                 next_id = i
 
-        # UNKNOWN=4, GREEN=2, YELLO=1, RED=0
-        #rospy.loginfo("WaypointUpdater: next light loop waypoint id %s, wp_x %s, wp_y %s, state %s, min_dist %s", next_id, loop_lights[next_id].pose.pose.position.x, loop_lights[next_id].pose.pose.position.y, loop_lights[next_id].state, min_dist)
+        # Expect a light in front of the car
+        if(self.stop_lights_wp_ids[next_id] < self.last_wp_id):
+            next_id = (next_id + 1) % len(self.lights)
+            wp_x = self.lights[next_id].pose.pose.position.x
+            wp_y = self.lights[next_id].pose.pose.position.y
+            min_dist = (car_x - wp_x)**2 + (car_y - wp_y)**2
 
-        is_red_light = ( loop_lights[next_id].state == TrafficLight.RED or loop_lights[next_id].state == TrafficLight.YELLOW ) and ( min_dist < SLOWDOWN_DIST )
+        # UNKNOWN=4, GREEN=2, YELLO=1, RED=0
+        #rospy.loginfo("WaypointUpdater: next light id %s, light_wp id %s, light_x %s, light_y %s, state %s, min_dist %s", next_id, self.stop_lights_wp_ids[next_id], self.lights[next_id].pose.pose.position.x, self.lights[next_id].pose.pose.position.y, self.lights[next_id].state, min_dist)
+
+        is_red_light = ( self.lights[next_id].state == TrafficLight.RED or self.lights[next_id].state == TrafficLight.YELLOW ) and ( min_dist < SLOWDOWN_DIST )
         rospy.loginfo("WaypointUpdater: RED?=%s", is_red_light)
        
         car_vx = self.current_velocity.twist.linear.x
-        # adjst next_waypoints velocity
+        # Adjust next_waypoints velocity
         for i in range(len(next_waypoints)-1):
             if not is_red_light:
                 self.set_waypoint_velocity(next_waypoints, i, self.max_speed) 
@@ -170,6 +179,20 @@ class WaypointUpdater(object):
         lane.waypoints = next_waypoints
         lane.header.stamp = rospy.get_rostime()
         self.final_waypoints_pub.publish(lane)
+
+
+    def get_closest_waypoint(self, pose):
+        min_dist = sys.maxsize
+        next_id = None
+        for i in range(len(self.waypoints) - 1):
+            wp_x = self.waypoints[i].pose.pose.position.x
+            wp_y = self.waypoints[i].pose.pose.position.y
+            dist = (pose.position.x - wp_x)**2 + (pose.position.y - wp_y)**2
+            if dist < min_dist :
+                min_dist = dist
+                next_id = i
+        return next_id
+
 
 if __name__ == '__main__':
     try:

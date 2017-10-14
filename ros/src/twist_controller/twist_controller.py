@@ -33,9 +33,10 @@ class Controller(object):
         # TODO: Change the arg, kwarg list to suit your needs. Return throttle, brake, steer
         if self.last_timestamp is None or not dbw_enabled:
             self.last_timestamp = rospy.get_time()
-            # reset throttle PID
+            # reset throttle PID, steer filter
             if not dbw_enabled:
                 self.throttle_pid.reset()
+                self.filter.reset()
             return 0., 0., 0.
         ### only one of throttle & brake allowed to be non-Zero
         error = min(target_v.x, self.max_speed) - current_v.x
