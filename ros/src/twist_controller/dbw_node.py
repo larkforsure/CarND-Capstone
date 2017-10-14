@@ -35,7 +35,7 @@ class DBWNode(object):
     def __init__(self):
         rospy.init_node('dbw_node')
 
-        max_speed = 0.447*rospy.get_param('/waypoint_loader/velocity', 40.)
+        max_speed = self.kmph2mps(rospy.get_param('/waypoint_loader/velocity', 40.))
         vehicle_mass = rospy.get_param('~vehicle_mass', 1736.35)
         fuel_capacity = rospy.get_param('~fuel_capacity', 13.5)
         brake_deadband = rospy.get_param('~brake_deadband', .1)
@@ -137,6 +137,9 @@ class DBWNode(object):
     def twist_cmd_cb(self, msg):
         #rospy.loginfo("DBWNode: received twist cmd %s", msg)
         self.twist_cmd = msg
+
+    def kmph2mps(self, velocity_kmph):
+        return (velocity_kmph * 1000.) / (60. * 60.)
 
 if __name__ == '__main__':
     DBWNode()

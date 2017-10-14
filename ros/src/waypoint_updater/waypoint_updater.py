@@ -24,13 +24,13 @@ TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 
 LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
 SLOWDOWN_WPS = 50 # Number of waypoints before traffic light to start slowing down
-SLOWDOWN_DIST = 1000 # Dist before traffic light to start slowing down
+SLOWDOWN_DIST = 1200 # Dist before traffic light to start slowing down
 
 class WaypointUpdater(object):
     def __init__(self):
         rospy.init_node('waypoint_updater')
 
-        self.max_speed = 0.447*rospy.get_param('/waypoint_loader/velocity', 40.)
+        self.max_speed = self.kmph2mps(rospy.get_param('/waypoint_loader/velocity', 40.))
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
         # temporary 
@@ -153,17 +153,34 @@ class WaypointUpdater(object):
                 next_id = i
 
         # Expect a light in front of the car
-        if(self.stop_lights_wp_ids[next_id] < self.last_wp_id):
+        # corner case: car is wrapping the starting point
+        wp_len = len(self.waypoints)
+        # case 1
+        is_car_wrap_1 = self.stop_lights_wp_ids[next_id] > 0.9 * wp_len \
+                           and self.last_wp_id < 0.1 * wp_len
+        # caes 2
+        is_car_wrap_2 = self.stop_lights_wp_ids[next_id] < 0.1 * wp_len \
+                            and self.last_wp_id > 0.9 * wp_len
+        is_car_wrap = is_car_wrap_1 or is_car_wrap_2
+        if is_car_wrap:
+            rospy.loginfo("WaypointUpdater: Car wrapping starting point, logic reversed")
+
+        # in these two cases, the decision logic shall be revsered
+        cmp_result = self.stop_lights_wp_ids[next_id] < self.last_wp_id
+        if is_car_wrap:
+            cmp_result = not cmp_result
+        
+        if cmp_result:
             next_id = (next_id + 1) % len(self.lights)
             wp_x = self.lights[next_id].pose.pose.position.x
             wp_y = self.lights[next_id].pose.pose.position.y
             min_dist = (car_x - wp_x)**2 + (car_y - wp_y)**2
 
         # UNKNOWN=4, GREEN=2, YELLO=1, RED=0
-        #rospy.loginfo("WaypointUpdater: next light id %s, light_wp id %s, light_x %s, light_y %s, state %s, min_dist %s", next_id, self.stop_lights_wp_ids[next_id], self.lights[next_id].pose.pose.position.x, self.lights[next_id].pose.pose.position.y, self.lights[next_id].state, min_dist)
+        #rospy.loginfo("WaypointUpdater: next light id %s, light_wp id %s, light_x %s, light_y %s, state %s, min_dist %s, car_wp_id, %s, car_wrap %s", next_id, self.stop_lights_wp_ids[next_id], self.lights[next_id].pose.pose.position.x, self.lights[next_id].pose.pose.position.y, self.lights[next_id].state, min_dist, self.last_wp_id, is_car_wrap)
 
         is_red_light = ( self.lights[next_id].state == TrafficLight.RED or self.lights[next_id].state == TrafficLight.YELLOW ) and ( min_dist < SLOWDOWN_DIST )
-        rospy.loginfo("WaypointUpdater: RED?=%s", is_red_light)
+        rospy.loginfo("WaypointUpdater: RED?=%s, next light id %s", is_red_light, next_id)
        
         car_vx = self.current_velocity.twist.linear.x
         # Adjust next_waypoints velocity
@@ -193,6 +210,8 @@ class WaypointUpdater(object):
                 next_id = i
         return next_id
 
+    def kmph2mps(self, velocity_kmph):
+        return (velocity_kmph * 1000.) / (60. * 60.)
 
 if __name__ == '__main__':
     try:
