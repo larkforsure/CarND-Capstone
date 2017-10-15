@@ -13,6 +13,7 @@ import yaml,math,sys
 
 STATE_COUNT_THRESHOLD = 3
 SLOWDOWN_DIST = 3000 # Dist**2 before next light to start slowing down / image detection
+LIGHTS_TABLE = ['RED', 'YELLOW', 'GREEN', 'N/A', 'UNKNOWN'] # refer to styx_msgs/msg/TrafficLight.msg
 
 class TLDetector(object):
     def __init__(self):
@@ -38,7 +39,7 @@ class TLDetector(object):
         rely on the position of the light and the camera image to predict it.
         '''
         sub3 = rospy.Subscriber('/vehicle/traffic_lights', TrafficLightArray, self.lights_cb)
-        sub6 = rospy.Subscriber('/image_color', Image, self.image_cb)
+        sub6 = rospy.Subscriber('/image_color', Image, self.image_cb, queue_size=1)
 
         config_string = rospy.get_param("/traffic_light_config")
         self.config = yaml.load(config_string)
@@ -47,8 +48,12 @@ class TLDetector(object):
         
         self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32, queue_size=1)
 
+        model_path = rospy.get_param('~model_path')
+        rospy.loginfo("TLDetector: Model path %s", model_path)
+        sys.stdout.flush()
+
         self.bridge = CvBridge()
-        self.light_classifier = TLClassifier()
+        self.light_classifier = TLClassifier(model_path)
         self.listener = tf.TransformListener()
 
         self.state = TrafficLight.UNKNOWN
@@ -57,6 +62,7 @@ class TLDetector(object):
         self.state_count = 0
 
         rospy.loginfo("TL Detection : Initialization done");
+        sys.stdout.flush()
 
         rospy.spin()
 
@@ -147,15 +153,16 @@ class TLDetector(object):
 
         """
         if(not self.has_image):
-            self.prev_light_loc = None
-            return False
+            # self.prev_light_loc = None
+            return TrafficLight.RED
+        cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "rgb8")
 
-        cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
+        # temporary , using "/vehicle/traffic_lights" 
+        # return light.state
 
-        # temporary
-        return light.state
         #Get classification
-        #return self.light_classifier.get_classification(cv_image)
+        predicated_state = self.light_classifier.get_classification(cv_image)
+        return predicated_state
 
 
 
@@ -244,7 +251,6 @@ class TLDetector(object):
             wp_y = stop_lights_positions[next_id][1]
             min_dist = (car_x - wp_x)**2 + (car_y - wp_y)**2
 
-        # UNKNOWN=4, GREEN=2, YELLO=1, RED=0
         #rospy.loginfo("TLDetector: next light id %s, light_wp id %s, light_x %s, light_y %s, min_dist %s, car_wp_id, %s, car_wrap %s", next_id, self.stop_lights_wp_ids[next_id], stop_lights_positions[next_id][0], stop_lights_positions[next_id][1], min_dist, self.last_wp_id, is_car_wrap)
 
         light = self.lights[next_id] # shall we rely on the existence of this topic?
@@ -252,8 +258,9 @@ class TLDetector(object):
         if light and min_dist < SLOWDOWN_DIST:  # publish -1 when still far away from the next light
             state = self.get_light_state(light)
             
-            is_red_light = ( light.state == TrafficLight.RED ) and ( min_dist < SLOWDOWN_DIST )
-            rospy.loginfo("TLDetector:: Ground truth RED?=%s, next light id %s", is_red_light, next_id)
+            rospy.loginfo("TLDetector:: predicated %s, ground truth %s, next light id %s", LIGHTS_TABLE[state], LIGHTS_TABLE[light.state], next_id)
+            sys.stdout.flush()
+            
             return self.stop_lights_wp_ids[next_id], state
         else:
             #??? self.waypoints = None

@@ -30,7 +30,7 @@ class WaypointUpdater(object):
         rospy.init_node('waypoint_updater')
 
         self.max_speed = self.kmph2mps(rospy.get_param('/waypoint_loader/velocity', 40.))
-        rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
+        rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb, queue_size=1)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
         #rospy.Subscriber('/vehicle/traffic_lights', TrafficLightArray, self.lights_cb)
 
