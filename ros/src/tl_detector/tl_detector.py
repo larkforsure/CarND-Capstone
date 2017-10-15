@@ -12,7 +12,7 @@ import numpy as np
 import yaml,math,sys
 
 STATE_COUNT_THRESHOLD = 3
-SLOWDOWN_DIST = 3000 # Dist**2 before next light to start slowing down / image detection
+SLOWDOWN_DIST = 5000 # Dist**2 before next light to start slowing down / image detection
 LIGHTS_TABLE = ['RED', 'YELLOW', 'GREEN', 'N/A', 'UNKNOWN'] # refer to styx_msgs/msg/TrafficLight.msg
 
 class TLDetector(object):
@@ -39,7 +39,6 @@ class TLDetector(object):
         rely on the position of the light and the camera image to predict it.
         '''
         sub3 = rospy.Subscriber('/vehicle/traffic_lights', TrafficLightArray, self.lights_cb)
-        sub6 = rospy.Subscriber('/image_color', Image, self.image_cb, queue_size=1)
 
         config_string = rospy.get_param("/traffic_light_config")
         self.config = yaml.load(config_string)
@@ -61,6 +60,8 @@ class TLDetector(object):
         self.last_light_wp_id = -1
         self.state_count = 0
 
+        sub6 = rospy.Subscriber('/image_color', Image, self.image_cb, queue_size=1,  buff_size=1024*65536) # Must set buffer size, or it will have packets lag !!
+        
         rospy.loginfo("TL Detection : Initialization done");
         sys.stdout.flush()
 
@@ -86,7 +87,8 @@ class TLDetector(object):
 
 
     def image_cb(self, msg):
-        if ( self.current_pose is None or self.loop_waypoints is None ) :
+        if ( self.current_pose is None or self.loop_waypoints is None 
+                or self.light_classifier is None ) :
             return
         """Identifies red lights in the incoming camera image and publishes the index
             of the waypoint closest to the red light's stop line to /traffic_waypoint

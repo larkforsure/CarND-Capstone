@@ -30,8 +30,6 @@ class WaypointUpdater(object):
         rospy.init_node('waypoint_updater')
 
         self.max_speed = self.kmph2mps(rospy.get_param('/waypoint_loader/velocity', 40.))
-        rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb, queue_size=1)
-        rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
         #rospy.Subscriber('/vehicle/traffic_lights', TrafficLightArray, self.lights_cb)
 
         # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
@@ -49,6 +47,9 @@ class WaypointUpdater(object):
         self.last_wp_id = None
         self.upcoming_red_light_wp_id = None
         
+        rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb, queue_size=1)
+        rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
+    
         rospy.spin()
 
     def pose_cb(self, poseStamped):
@@ -130,7 +131,7 @@ class WaypointUpdater(object):
         self.last_wp_id = next_id if next_id < wp_len else next_id - wp_len
       
         #rospy.loginfo("WaypointUpdater: car_wp_id %s, red_light_wp_id %s", self.last_wp_id, self.upcoming_red_light_wp_id)
-
+        #sys.stdout.flush()
         
         # Adjust next_waypoints velocity
         car_vx = self.current_velocity.twist.linear.x
@@ -145,7 +146,7 @@ class WaypointUpdater(object):
                     if dist < 0:
                         dist = dist + wp_len
                     # Step by step decelaration
-                    target_v = max(0, car_vx - (i+1)*(car_vx/(dist-1)))
+                    target_v = max(0, car_vx - (i+1)*(car_vx/(dist-1))) 
                 #rospy.loginfo("WaypointUpdater: car_vx %s, dist %s, point %s, target_v %s", car_vx, dist, i, target_v)
                 self.set_waypoint_velocity(next_waypoints, i, target_v)
 

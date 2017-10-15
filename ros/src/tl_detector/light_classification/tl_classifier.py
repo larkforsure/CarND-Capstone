@@ -1,12 +1,13 @@
 from styx_msgs.msg import TrafficLight
 import tensorflow as tf
 import numpy as np
+import os
 
 class TLClassifier(object):
     def __init__(self, model_path):
         #TODO load classifier
         self.model_path = model_path
-        
+
         # get the traffic light classifier
         config = tf.ConfigProto(log_device_placement=True)
         config.gpu_options.per_process_gpu_memory_fraction = 0.2  # don't hog all the VRAM!
