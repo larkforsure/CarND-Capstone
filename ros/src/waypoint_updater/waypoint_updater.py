@@ -32,12 +32,11 @@ class WaypointUpdater(object):
         self.max_speed = self.kmph2mps(rospy.get_param('/waypoint_loader/velocity', 40.))
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
-        # temporary 
-        rospy.Subscriber('/vehicle/traffic_lights', TrafficLightArray, self.lights_cb)
+        #rospy.Subscriber('/vehicle/traffic_lights', TrafficLightArray, self.lights_cb)
 
         # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
         rospy.Subscriber('/traffic_waypoint', Int32, self.upcoming_red_light_cb)
-        rospy.Subscriber('/current_velocity', TwistStamped, self.current_velocity_cb, queue_size=1)
+        rospy.Subscriber('/current_velocity', TwistStamped, self.current_velocity_cb)
 
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
@@ -49,10 +48,6 @@ class WaypointUpdater(object):
         self.current_velocity = None
         self.last_wp_id = None
         self.upcoming_red_light_wp_id = None
-        
-        # temporary lights nearest waypoints IDs
-        self.stop_lights_wp_ids = []
-        self.lights = None
         
         rospy.spin()
 
@@ -80,7 +75,8 @@ class WaypointUpdater(object):
         self.upcoming_red_light_wp_id = light_wp_id.data
 
     def lights_cb(self, trafficLightArray):
-        self.lights = trafficLightArray.lights
+        #self.lights = trafficLightArray.lights
+        pass
 
     def obstacle_cb(self, msg):
         # TODO: Callback for /obstacle_waypoint message. We will implement it later
@@ -102,8 +98,7 @@ class WaypointUpdater(object):
 
     def update_waypoints(self):
         if ( self.loop_waypoints is None or self.current_velocity is None
-                or self.current_pose is None or self.lights is None 
-                or self.upcoming_red_light_wp_id is None ):
+                or self.current_pose is None or self.upcoming_red_light_wp_id is None ):
             return
 
         car_x = self.current_pose.position.x

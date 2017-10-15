@@ -12,7 +12,7 @@ import numpy as np
 import yaml,math,sys
 
 STATE_COUNT_THRESHOLD = 3
-SLOWDOWN_DIST = 3000 # Dist**2 before traffic light to start slowing down
+SLOWDOWN_DIST = 3000 # Dist**2 before next light to start slowing down / image detection
 
 class TLDetector(object):
     def __init__(self):
@@ -26,7 +26,6 @@ class TLDetector(object):
         self.lights = []
 
         self.sim_testing = bool(rospy.get_param("~sim_testing", True))
-        threshold = rospy.get_param('~threshold', 0.3)
 
         sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         sub2 = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
@@ -39,7 +38,7 @@ class TLDetector(object):
         rely on the position of the light and the camera image to predict it.
         '''
         sub3 = rospy.Subscriber('/vehicle/traffic_lights', TrafficLightArray, self.lights_cb)
-        sub6 = rospy.Subscriber('/image_color', Image, self.image_cb, queue_size=1, buff_size=2*52428800) # extended
+        sub6 = rospy.Subscriber('/image_color', Image, self.image_cb)
 
         config_string = rospy.get_param("/traffic_light_config")
         self.config = yaml.load(config_string)
@@ -135,6 +134,8 @@ class TLDetector(object):
                 next_id = i
         return next_id
 
+
+
     def get_light_state(self, light):
         """Determines the current color of the traffic light
 
@@ -195,6 +196,7 @@ class TLDetector(object):
  
         # List of positions that correspond to the line to stop in front of for a given intersection
         stop_lights_positions = self.config['stop_line_positions']
+        
         # One-time processing of lights_positions to lights nearest waypoint IDs
         if len(self.stop_lights_wp_ids) == 0:
             for p in stop_lights_positions:
@@ -222,11 +224,11 @@ class TLDetector(object):
         # corner case: car is wrapping the starting point
         wp_len = len(self.waypoints)
         # case 1
-        is_car_wrap_1 = self.stop_lights_wp_ids[next_id] > 0.9 * wp_len \
-                            and self.last_wp_id < 0.1 * wp_len
+        is_car_wrap_1 = self.stop_lights_wp_ids[next_id] > 0.7 * wp_len \
+                            and self.last_wp_id < 0.2 * wp_len
         # caes 2
-        is_car_wrap_2 = self.stop_lights_wp_ids[next_id] < 0.1 * wp_len \
-                            and self.last_wp_id > 0.9 * wp_len
+        is_car_wrap_2 = self.stop_lights_wp_ids[next_id] < 0.2 * wp_len \
+                            and self.last_wp_id > 0.7 * wp_len
         is_car_wrap = is_car_wrap_1 or is_car_wrap_2
         if is_car_wrap:
             rospy.loginfo("TLDetector: Car wrapping starting point, logic reversed")
@@ -250,8 +252,8 @@ class TLDetector(object):
         if light and min_dist < SLOWDOWN_DIST:  # publish -1 when still far away from the next light
             state = self.get_light_state(light)
             
-            is_red_light = ( state == TrafficLight.RED ) and ( min_dist < SLOWDOWN_DIST )
-            rospy.loginfo("TLDetector:: RED?=%s, next light id %s", is_red_light, next_id)
+            is_red_light = ( light.state == TrafficLight.RED ) and ( min_dist < SLOWDOWN_DIST )
+            rospy.loginfo("TLDetector:: Ground truth RED?=%s, next light id %s", is_red_light, next_id)
             return self.stop_lights_wp_ids[next_id], state
         else:
             #??? self.waypoints = None
