@@ -47,15 +47,19 @@ class WaypointUpdater(object):
         self.last_wp_id = None
         self.upcoming_red_light_wp_id = None
         
-        rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb, queue_size=1)
+        rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
-    
-        rospy.spin()
+   
+        rate = rospy.Rate(13) # Nyquist ?
+        while not rospy.is_shutdown():
+            self.update_waypoints()
+            rate.sleep()
+
 
     def pose_cb(self, poseStamped):
         self.current_pose = poseStamped.pose
         #rospy.loginfo("WaypointUpdater: Car position updated to %s", self.current_pose)
-        self.update_waypoints()
+        #self.update_waypoints()
 
 
     # publishes a list of all waypoints for the track and it only publishes once
@@ -66,7 +70,7 @@ class WaypointUpdater(object):
             # Tricky, duplicate waypoints to deal with wrap problem
             self.loop_waypoints = self.waypoints[:]
             self.loop_waypoints.extend(self.loop_waypoints)
-            self.update_waypoints()
+            #self.update_waypoints()
 
 
     def current_velocity_cb(self, twistStamped):
@@ -140,7 +144,7 @@ class WaypointUpdater(object):
                 self.set_waypoint_velocity(next_waypoints, i, self.max_speed) 
             else:
                 dist = self.upcoming_red_light_wp_id - self.last_wp_id
-                if abs(dist) <= 1: # avoid divide 0, or unfortunate -1 
+                if abs(dist) <= 2: # avoid divide 0, or unfortunate -1 
                     target_v = 0
                 else: 
                     if dist < 0:

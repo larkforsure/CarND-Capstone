@@ -11,8 +11,8 @@ import cv2
 import numpy as np
 import yaml,math,sys
 
-STATE_COUNT_THRESHOLD = 3
-SLOWDOWN_DIST = 5000 # Dist**2 before next light to start slowing down / image detection
+STATE_COUNT_THRESHOLD = 1
+SLOWDOWN_DIST = 3600 # Dist**2 before next light to start slowing down / image detection
 LIGHTS_TABLE = ['RED', 'YELLOW', 'GREEN', 'N/A', 'UNKNOWN'] # refer to styx_msgs/msg/TrafficLight.msg
 
 class TLDetector(object):
@@ -55,17 +55,25 @@ class TLDetector(object):
         self.light_classifier = TLClassifier(model_path)
         self.listener = tf.TransformListener()
 
-        self.state = TrafficLight.UNKNOWN
+        # Let the car stop in the very beginning
+        self.state_count = STATE_COUNT_THRESHOLD
+        self.state = TrafficLight.RED 
         self.last_state = TrafficLight.UNKNOWN
         self.last_light_wp_id = -1
-        self.state_count = 0
 
-        sub6 = rospy.Subscriber('/image_color', Image, self.image_cb, queue_size=1,  buff_size=1024*65536) # Must set buffer size, or it will have packets lag !!
+        sub6 = rospy.Subscriber('/image_color', Image, self.image_cb, buff_size=1024*65536) # When set low sampling freq, the lag disappeared, even default buff_size ??
+        #sub6 = rospy.Subscriber('/image_color', Image, self.image_cb, queue_size=1,  buff_size=1024*65536) # Set buffer size, or it will have packets lag 
         
         rospy.loginfo("TL Detection : Initialization done");
         sys.stdout.flush()
 
-        rospy.spin()
+        # Throttle the tf call freq, since if use image_cb freq, the tf computation will give severe detection lag
+        # PS. we still have detection lag, which means the pose/state detection fall behind the scene. I donnot know how to compensate it
+        rate = rospy.Rate(6)
+        while not rospy.is_shutdown():
+            self.loop()
+            rate.sleep()
+
 
 
     def pose_cb(self, poseStamped):
@@ -87,9 +95,6 @@ class TLDetector(object):
 
 
     def image_cb(self, msg):
-        if ( self.current_pose is None or self.loop_waypoints is None 
-                or self.light_classifier is None ) :
-            return
         """Identifies red lights in the incoming camera image and publishes the index
             of the waypoint closest to the red light's stop line to /traffic_waypoint
 
@@ -99,6 +104,13 @@ class TLDetector(object):
         """
         self.has_image = True
         self.camera_image = msg
+
+
+    def loop(self):
+        if ( self.current_pose is None or self.loop_waypoints is None 
+                or self.light_classifier is None or self.camera_image is None ) :
+            return
+
         light_wp_id, state = self.process_traffic_lights()
 
         '''
@@ -144,12 +156,8 @@ class TLDetector(object):
 
 
 
-    def get_light_state(self, light):
+    def get_light_state(self):
         """Determines the current color of the traffic light
-
-        Args:
-            light (TrafficLight): light to classify
-
         Returns:
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
 
@@ -158,9 +166,6 @@ class TLDetector(object):
             # self.prev_light_loc = None
             return TrafficLight.RED
         cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "rgb8")
-
-        # temporary , using "/vehicle/traffic_lights" 
-        # return light.state
 
         #Get classification
         predicated_state = self.light_classifier.get_classification(cv_image)
@@ -258,7 +263,7 @@ class TLDetector(object):
         light = self.lights[next_id] # shall we rely on the existence of this topic?
 
         if light and min_dist < SLOWDOWN_DIST:  # publish -1 when still far away from the next light
-            state = self.get_light_state(light)
+            state = self.get_light_state()
             
             rospy.loginfo("TLDetector:: predicated %s, ground truth %s, next light id %s", LIGHTS_TABLE[state], LIGHTS_TABLE[light.state], next_id)
             sys.stdout.flush()
