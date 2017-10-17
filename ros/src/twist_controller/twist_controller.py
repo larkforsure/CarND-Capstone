@@ -13,8 +13,8 @@ class Controller(object):
         self.accel_limit = accel_limit
         self.decel_limit = decel_limit
         self.max_steer_angle = max_steer_angle
-        self.throttle_pid = PID(8.0, 0.0005, 0.0)
-        self.brake_pid = PID(15.0, 0.0, 17000.0)
+        self.throttle_pid = PID(6.5, 0.001, 0.0)
+        self.brake_pid = PID(1000.0, 20.0, 0.0)
         self.yaw_control = YawController(wheel_base, steer_ratio,
                         min_speed, max_lat_accel, max_steer_angle)
         self.filter = LowPassFilter(0.2, 0.1)
@@ -30,28 +30,22 @@ class Controller(object):
     '''
     def control(self, target_v, target_w, current_v, dbw_enabled):
         # TODO: Change the arg, kwarg list to suit your needs. Return throttle, brake, steer
-        if self.last_timestamp is None or not dbw_enabled:
+        if self.last_timestamp is None or not dbw_enabled or target_v.x < 0.001:
             self.last_timestamp = rospy.get_time()
             # Reset throttle PID, steer filter
-            if not dbw_enabled:
-                self.throttle_pid.reset()
-                self.brake_pid.reset()
-                self.filter.reset()
-            return 0., 0., 0.
-        # Car is actually stopping there
-        if target_v.x < 0.1:
-            self.last_timestamp = rospy.get_time()
             self.throttle_pid.reset()
             self.brake_pid.reset()
             self.filter.reset()
-            return 0., 5., 0.
-        
+            return 0., 3000., 0.
+  
+
         ### Only one of throttle & brake allowed to be non-Zero
         error = min(target_v.x, self.max_speed) - current_v.x
         dt = rospy.get_time() - self.last_timestamp
-        if not abs(target_v.x - self.max_speed) < 0.1:
+        # braking
+        if error < 0:
             brake = self.brake_pid.step(-1.0*error, dt)
-            brake = max(brake, 5.0)
+            brake = max(brake, 1.0)
             # Reset throttle PID
             self.throttle_pid.reset()
             throttle = 0.0
@@ -65,9 +59,10 @@ class Controller(object):
 
         steering = self.yaw_control.get_steering(target_v.x, target_w.z, current_v.x)
         steering = self.filter.filt(steering)
-        steering = min(max(steering, -1.), 1.)
+        steering = min(max(steering, -3.), 3.)
         
         self.last_timestamp = rospy.get_time()
         
-        #rospy.loginfo("Controller: caculated throttle %s, steering %s, brake %s", throttle, steering, brake)
+        if not brake == 0.0:
+            rospy.loginfo("Controller: target_v %s, error %s, caculated throttle %s, steering %s, brake %s", target_v.x, error, throttle, steering, brake)
         return throttle, brake, steering

@@ -28,7 +28,6 @@ class TLDetector(object):
 
         self.sim_testing = bool(rospy.get_param("~sim_testing", True))
 
-        sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         sub2 = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
 
         '''
@@ -45,7 +44,7 @@ class TLDetector(object):
         # lights nearest waypoint IDs
         self.stop_lights_wp_ids = []
         
-        self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32, queue_size=1)
+        self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32)
 
         model_path = rospy.get_param('~model_path')
         rospy.loginfo("TLDetector: Model path %s", model_path)
@@ -61,19 +60,16 @@ class TLDetector(object):
         self.last_state = TrafficLight.UNKNOWN
         self.last_light_wp_id = -1
 
-        sub6 = rospy.Subscriber('/image_color', Image, self.image_cb, buff_size=1024*65536) # When set low sampling freq, the lag disappeared, even default buff_size ??
-        #sub6 = rospy.Subscriber('/image_color', Image, self.image_cb, queue_size=1,  buff_size=1024*65536) # Set buffer size, or it will have packets lag 
+        sub6 = rospy.Subscriber('/image_color', Image, self.image_cb) 
+        sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         
         rospy.loginfo("TL Detection : Initialization done");
         sys.stdout.flush()
 
-        # Throttle the tf call freq, since if use image_cb freq, the tf computation will give severe detection lag
-        # PS. we still have detection lag, which means the pose/state detection fall behind the scene. I donnot know how to compensate it
-        rate = rospy.Rate(6)
+        rate = rospy.Rate( STATE_COUNT_THRESHOLD + 1 )         
         while not rospy.is_shutdown():
             self.loop()
             rate.sleep()
-
 
 
     def pose_cb(self, poseStamped):
@@ -108,7 +104,7 @@ class TLDetector(object):
 
     def loop(self):
         if ( self.current_pose is None or self.loop_waypoints is None 
-                or self.light_classifier is None or self.camera_image is None ) :
+                or self.light_classifier is None or self.camera_image is None ): 
             return
 
         light_wp_id, state = self.process_traffic_lights()
@@ -182,6 +178,43 @@ class TLDetector(object):
             int: ID of traffic light color (specified in styx_msgs/TrafficLight)
 
         """
+        # Due to the tf inference lag, have to bring inference computation up. Or else the car_x, car_y will be actaully obsolete values, i.e. fall behind 
+        # List of positions that correspond to the line to stop in front of for a given intersection
+        stop_lights_positions = self.config['stop_line_positions']
+        
+        # One-time processing of lights_positions to lights nearest waypoint IDs
+        if len(self.stop_lights_wp_ids) == 0:
+            for p in stop_lights_positions:
+                pose = Pose()
+                pose.position.x = p[0]
+                pose.position.y = p[1]
+                wp_id = self.get_closest_waypoint(pose)
+                self.stop_lights_wp_ids.append(wp_id)
+            rospy.loginfo("TLDetector: Generated stop lights waypoint IDs %s", self.stop_lights_wp_ids)    
+            sys.stdout.flush()
+
+        car_x = self.current_pose.position.x
+        car_y = self.current_pose.position.y
+
+        # Find the closest visible traffic light (if one exists)
+        min_dist = sys.maxsize
+        next_id = None
+        for i in range(len(stop_lights_positions)-1):
+            wp_x = stop_lights_positions[i][0]
+            wp_y = stop_lights_positions[i][1]
+            dist = (car_x - wp_x)**2 + (car_y - wp_y)**2
+            if dist < min_dist :
+                min_dist = dist
+                next_id = i
+
+        # Here is to minimize the inference caculation
+        # min_dist might be in front of the car or fall behind, don't care
+        state = None
+        if min_dist < SLOWDOWN_DIST:
+            state = self.get_light_state()
+
+
+        # Get them again, the actual values after tf inference lag
         car_x = self.current_pose.position.x
         car_y = self.current_pose.position.y
         
@@ -204,25 +237,10 @@ class TLDetector(object):
                 next_id = i
 
         #rospy.loginfo("TLDetector: next loop waypoint id %s, wp_x %s, wp_y %s", next_id, self.loop_waypoints[next_id].pose.pose.position.x, self.loop_waypoints[next_id].pose.pose.position.y)
-        # chop back
+        # Chop back
         self.last_wp_id = next_id if next_id < wp_len else next_id - wp_len
 
  
-        # List of positions that correspond to the line to stop in front of for a given intersection
-        stop_lights_positions = self.config['stop_line_positions']
-        
-        # One-time processing of lights_positions to lights nearest waypoint IDs
-        if len(self.stop_lights_wp_ids) == 0:
-            for p in stop_lights_positions:
-                pose = Pose()
-                pose.position.x = p[0]
-                pose.position.y = p[1]
-                wp_id = self.get_closest_waypoint(pose)
-                self.stop_lights_wp_ids.append(wp_id)
-            rospy.loginfo("TLDetector: Generated stop lights waypoint IDs %s", self.stop_lights_wp_ids)    
-            sys.stdout.flush()
-
-
         # Find the closest visible traffic light (if one exists)
         min_dist = sys.maxsize
         next_id = None
@@ -247,7 +265,7 @@ class TLDetector(object):
         if is_car_wrap:
             rospy.loginfo("TLDetector: Car wrapping starting point, logic reversed")
 
-        # in these two cases, the decision logic shall be revsered
+        # In these two cases, the decision logic shall be revsered
         cmp_result = self.stop_lights_wp_ids[next_id] < self.last_wp_id
         if is_car_wrap:
             cmp_result = not cmp_result
@@ -262,8 +280,7 @@ class TLDetector(object):
 
         light = self.lights[next_id] # shall we rely on the existence of this topic?
 
-        if light and min_dist < SLOWDOWN_DIST:  # publish -1 when still far away from the next light
-            state = self.get_light_state()
+        if light and state is not None and min_dist < SLOWDOWN_DIST:  # publish -1 when still far away from the next light
             
             rospy.loginfo("TLDetector:: predicated %s, ground truth %s, next light id %s", LIGHTS_TABLE[state], LIGHTS_TABLE[light.state], next_id)
             sys.stdout.flush()

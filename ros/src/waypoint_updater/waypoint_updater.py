@@ -22,14 +22,13 @@ as well as to verify your TL classifier.
 TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 
-LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
-SLOWDOWN_WPS = 50 # Number of waypoints before traffic light to start slowing down
+LOOKAHEAD_WPS = 50 # Number of waypoints we will publish. You can change this number
 
 class WaypointUpdater(object):
     def __init__(self):
         rospy.init_node('waypoint_updater')
 
-        self.max_speed = self.kmph2mps(rospy.get_param('/waypoint_loader/velocity', 40.))
+        self.max_speed = rospy.get_param('/waypoint_loader/velocity', 40.)
         #rospy.Subscriber('/vehicle/traffic_lights', TrafficLightArray, self.lights_cb)
 
         # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
@@ -50,7 +49,7 @@ class WaypointUpdater(object):
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
    
-        rate = rospy.Rate(13) # Nyquist ?
+        rate = rospy.Rate(4) 
         while not rospy.is_shutdown():
             self.update_waypoints()
             rate.sleep()
@@ -116,8 +115,8 @@ class WaypointUpdater(object):
         begin = 0 
         end = wp_len # the first search shall be inside orignal waypoints
         if self.last_wp_id is not None:
-            begin = max(0, self.last_wp_id - 1)
-            end = min(end * 2, self.last_wp_id + 5) # search extend to duplicated loop waypoints
+            begin = max(0, self.last_wp_id - 2)
+            end = min(end * 2, self.last_wp_id + 8) # search extend to duplicated loop waypoints
 
         for i in range(begin, end):
             wp_x = self.loop_waypoints[i].pose.pose.position.x
@@ -131,7 +130,7 @@ class WaypointUpdater(object):
 
         # Fulfill LOOKAHEAD_WPS waypoints starting from next_id
         next_waypoints = self.loop_waypoints[next_id : next_id+LOOKAHEAD_WPS-1]
-        # chop back
+        # Chop back
         self.last_wp_id = next_id if next_id < wp_len else next_id - wp_len
       
         #rospy.loginfo("WaypointUpdater: car_wp_id %s, red_light_wp_id %s", self.last_wp_id, self.upcoming_red_light_wp_id)
@@ -139,20 +138,24 @@ class WaypointUpdater(object):
         
         # Adjust next_waypoints velocity
         car_vx = self.current_velocity.twist.linear.x
+        car_dist = None
         for i in range(len(next_waypoints)-1):
+            target_v = None
             if self.upcoming_red_light_wp_id == -1:
-                self.set_waypoint_velocity(next_waypoints, i, self.max_speed) 
+                target_v = self.max_speed
             else:
-                dist = self.upcoming_red_light_wp_id - self.last_wp_id
-                if abs(dist) <= 2: # avoid divide 0, or unfortunate -1 
-                    target_v = 0
-                else: 
-                    if dist < 0:
-                        dist = dist + wp_len
+                last_wp_id_i = self.last_wp_id + i
+                last_wp_id_i = last_wp_id_i if last_wp_id_i < wp_len else last_wp_id_i - wp_len
+                # Distance along the road
+                dist = self.distance(self.waypoints, last_wp_id_i, self.upcoming_red_light_wp_id - 1)
+                if i == 0:
+                    car_dist = dist
+                if car_dist < 5 or dist < 5: # dist != 0 only when wp1_id < wp2_id
+                    target_v = 0.
+                else:
                     # Step by step decelaration
-                    target_v = max(0, car_vx - (i+1)*(car_vx/(dist-1))) 
-                #rospy.loginfo("WaypointUpdater: car_vx %s, dist %s, point %s, target_v %s", car_vx, dist, i, target_v)
-                self.set_waypoint_velocity(next_waypoints, i, target_v)
+                    target_v = car_vx * 0.75 * (dist / car_dist)
+            self.set_waypoint_velocity(next_waypoints, i, target_v)
 
         # Construct a Lane message
         lane = Lane()

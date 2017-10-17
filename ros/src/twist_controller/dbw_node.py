@@ -35,7 +35,7 @@ class DBWNode(object):
     def __init__(self):
         rospy.init_node('dbw_node')
 
-        max_speed = self.kmph2mps(rospy.get_param('/waypoint_loader/velocity', 40.))
+        max_speed = rospy.get_param('/waypoint_loader/velocity', 40.)
         vehicle_mass = rospy.get_param('~vehicle_mass', 1736.35)
         fuel_capacity = rospy.get_param('~fuel_capacity', 13.5)
         brake_deadband = rospy.get_param('~brake_deadband', .1)
@@ -78,7 +78,7 @@ class DBWNode(object):
 
 
     def loop(self):
-        rate = rospy.Rate(26) # Nyquist ? 
+        rate = rospy.Rate(100) 
         while not rospy.is_shutdown():
             # TODO: Get predicted throttle, brake, and steering using `twist_controller`
             # You should only publish the control commands if dbw is enabled
