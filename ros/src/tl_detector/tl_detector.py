@@ -44,7 +44,7 @@ class TLDetector(object):
         # lights nearest waypoint IDs
         self.stop_lights_wp_ids = []
         
-        self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32)
+        self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32) # The receiver's freq is slower than publisher, use async message
 
         model_path = rospy.get_param('~model_path')
         rospy.loginfo("TLDetector: Model path %s", model_path)
@@ -66,7 +66,7 @@ class TLDetector(object):
         rospy.loginfo("TL Detection : Initialization done");
         sys.stdout.flush()
 
-        rate = rospy.Rate( STATE_COUNT_THRESHOLD + 1 )         
+        rate = rospy.Rate( 10) # The camera rate in yaml_to_camera_info_publisher is 10   
         while not rospy.is_shutdown():
             self.loop()
             rate.sleep()
@@ -164,8 +164,8 @@ class TLDetector(object):
         cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "rgb8")
 
         #Get classification
-        predicated_state = self.light_classifier.get_classification(cv_image)
-        return predicated_state
+        predicted_state = self.light_classifier.get_classification(cv_image)
+        return predicted_state
 
 
 
@@ -200,21 +200,32 @@ class TLDetector(object):
         min_dist = sys.maxsize
         next_id = None
         for i in range(len(stop_lights_positions)-1):
+            # The last light position is totally worng, must map to wp_id, then caculate distance
             wp_x = stop_lights_positions[i][0]
             wp_y = stop_lights_positions[i][1]
             dist = (car_x - wp_x)**2 + (car_y - wp_y)**2
             if dist < min_dist :
                 min_dist = dist
                 next_id = i
+            
+        cmp_result = self.stop_lights_wp_ids[next_id] < self.last_wp_id
+        if cmp_result:
+            next_id = (next_id + 1) % len(self.lights)
+            wp_x = stop_lights_positions[next_id][0]
+            wp_y = stop_lights_positions[next_id][1]
+            # FIXME shall be road distance
+            min_dist = (car_x - wp_x)**2 + (car_y - wp_y)**2
+
 
         # Here is to minimize the inference caculation
-        # min_dist might be in front of the car or fall behind, don't care
         state = None
-        if min_dist < SLOWDOWN_DIST:
+        if min_dist < 2 * SLOWDOWN_DIST : # We are still in moving during inference, so x1.5
             state = self.get_light_state()
+        #rospy.loginfo("min_dist %s, car_x %s, car_y %s, wp_x %s, wp_y %s, next_id %s", min_dist, car_x, car_y, wp_x, wp_y, next_id)
 
 
-        # Get them again, the actual values after tf inference lag
+        # After inference lag, do all the caculation again !!!
+        # The actual values after tf inference lag
         car_x = self.current_pose.position.x
         car_y = self.current_pose.position.y
         
@@ -249,6 +260,7 @@ class TLDetector(object):
             wp_y = stop_lights_positions[i][1]
             dist = (car_x - wp_x)**2 + (car_y - wp_y)**2
             if dist < min_dist :
+                # FIXME shall be road distance
                 min_dist = dist
                 next_id = i
 
@@ -256,14 +268,14 @@ class TLDetector(object):
         # corner case: car is wrapping the starting point
         wp_len = len(self.waypoints)
         # case 1
-        is_car_wrap_1 = self.stop_lights_wp_ids[next_id] > 0.7 * wp_len \
-                            and self.last_wp_id < 0.2 * wp_len
+        is_car_wrap_1 = self.stop_lights_wp_ids[next_id] > 0.6 * wp_len \
+                            and self.last_wp_id < 0.15 * wp_len
         # caes 2
-        is_car_wrap_2 = self.stop_lights_wp_ids[next_id] < 0.2 * wp_len \
-                            and self.last_wp_id > 0.7 * wp_len
+        is_car_wrap_2 = self.stop_lights_wp_ids[next_id] < 0.15 * wp_len \
+                            and self.last_wp_id > 0.6 * wp_len
         is_car_wrap = is_car_wrap_1 or is_car_wrap_2
         if is_car_wrap:
-            rospy.loginfo("TLDetector: Car wrapping starting point, logic reversed")
+            rospy.loginfo("TLDetector: Car is wrapping the starting point, logic reversed")
 
         # In these two cases, the decision logic shall be revsered
         cmp_result = self.stop_lights_wp_ids[next_id] < self.last_wp_id
@@ -274,15 +286,16 @@ class TLDetector(object):
             next_id = (next_id + 1) % len(self.lights)
             wp_x = stop_lights_positions[next_id][0]
             wp_y = stop_lights_positions[next_id][1]
+            # FIXME shall be road distance
             min_dist = (car_x - wp_x)**2 + (car_y - wp_y)**2
 
-        #rospy.loginfo("TLDetector: next light id %s, light_wp id %s, light_x %s, light_y %s, min_dist %s, car_wp_id, %s, car_wrap %s", next_id, self.stop_lights_wp_ids[next_id], stop_lights_positions[next_id][0], stop_lights_positions[next_id][1], min_dist, self.last_wp_id, is_car_wrap)
+        #rospy.loginfo("TLDetector: next light id %s, light_wp id %s, light_x %s, light_y %s, min_dist %s, car_wp_id, %s, car_wrap %s, cmp_result %s", next_id, self.stop_lights_wp_ids[next_id], stop_lights_positions[next_id][0], stop_lights_positions[next_id][1], min_dist, self.last_wp_id, is_car_wrap, cmp_result)
 
         light = self.lights[next_id] # shall we rely on the existence of this topic?
-
+        #rospy.loginfo("state %s, min_dist %s", light, state, min_dist)
         if light and state is not None and min_dist < SLOWDOWN_DIST:  # publish -1 when still far away from the next light
             
-            rospy.loginfo("TLDetector:: predicated %s, ground truth %s, next light id %s", LIGHTS_TABLE[state], LIGHTS_TABLE[light.state], next_id)
+            rospy.loginfo("TLDetector:: predicted %s, ground truth %s, next light id %s", LIGHTS_TABLE[state], LIGHTS_TABLE[light.state], next_id)
             sys.stdout.flush()
             
             return self.stop_lights_wp_ids[next_id], state

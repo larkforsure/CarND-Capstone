@@ -1,3 +1,4 @@
+import rospy
 from styx_msgs.msg import TrafficLight
 import tensorflow as tf
 import numpy as np
@@ -43,10 +44,11 @@ class TLClassifier(object):
         image_scaled = image_scaled * 2 - 1.
 
         # all honor to John Chen
-        predicated_state = [ TrafficLight.UNKNOWN ]
-        predicated_state = self.tf_session.run(self.tensor_predict, feed_dict = {
+        predicted_state = [ TrafficLight.UNKNOWN ]
+        predicted_state = self.tf_session.run(self.tensor_predict, feed_dict = {
                     self.tensor_input_real: image_scaled, 
                     self.tensor_drop_rate: 0. })
 
-        return predicated_state[0]
+        #rospy.loginfo("prediction: %s", predicted_state)        
+        return predicted_state[0]
 
