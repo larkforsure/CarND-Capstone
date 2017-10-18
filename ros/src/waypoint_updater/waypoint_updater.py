@@ -49,7 +49,7 @@ class WaypointUpdater(object):
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
    
-        rate = rospy.Rate(4) 
+        rate = rospy.Rate(10) 
         while not rospy.is_shutdown():
             self.update_waypoints()
             rate.sleep()

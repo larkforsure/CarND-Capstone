@@ -13,7 +13,7 @@ class Controller(object):
         self.accel_limit = accel_limit
         self.decel_limit = decel_limit
         self.max_steer_angle = max_steer_angle
-        self.throttle_pid = PID(3, 0.0, 0.0)
+        self.throttle_pid = PID(2.5, 0.0, 0.0)
         self.brake_pid = PID(9200.0, 20.0, 0.0)
         self.yaw_control = YawController(wheel_base, steer_ratio,
                         min_speed, max_lat_accel, max_steer_angle)
@@ -59,7 +59,7 @@ class Controller(object):
 
         steering = self.yaw_control.get_steering(target_v.x, target_w.z, current_v.x)
         steering = self.filter.filt(steering)
-        steering = min(max(steering, -1.), 1.)
+        steering = min(max(steering, -3.), 3.)
         
         self.last_timestamp = rospy.get_time()
         
