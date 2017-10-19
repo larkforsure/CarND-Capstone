@@ -66,7 +66,7 @@ class TLDetector(object):
         rospy.loginfo("TL Detection : Initialization done");
         sys.stdout.flush()
 
-        rate = rospy.Rate( 10) # The camera rate in yaml_to_camera_info_publisher is 10   
+        rate = rospy.Rate( 12) # The camera rate in yaml_to_camera_info_publisher is 10   
         while not rospy.is_shutdown():
             self.loop()
             rate.sleep()
@@ -209,15 +209,20 @@ class TLDetector(object):
             if dist < min_dist :
                 min_dist = dist
                 next_id = i
-            
-        cmp_result = self.stop_lights_wp_ids[next_id] <= self.last_wp_id
+       
+        # Find the nearest dist bwteen two continuous light , car may be between them or behind them
+        next_next_id = (next_id + 1) % len(self.lights)
+        wp_x = self.waypoints[self.stop_lights_wp_ids[next_next_id]].pose.pose.position.x
+        wp_y = self.waypoints[self.stop_lights_wp_ids[next_next_id]].pose.pose.position.y
+        next_min_dist = (car_x - wp_x)**2 + (car_y - wp_y)**2
+        min_dist = min(min_dist, next_min_dist)
 
         # Here is to minimize the inference caculation
         state = None
-        if min_dist < 1.6 * SLOWDOWN_DIST: # We are still in moving during inference, so x2
+        if min_dist < 1.5 * SLOWDOWN_DIST: # We are still in moving during inference, so x2
             state = self.get_light_state()
         #rospy.loginfo("min_dist %s, car_x %s, car_y %s, wp_x %s, wp_y %s, next_id %s", min_dist, car_x, car_y, wp_x, wp_y, next_id)
-
+        last_min_dist = min_dist
 
         # After inference lag, do all the caculation again !!!
         # The actual values after tf inference lag
@@ -294,7 +299,7 @@ class TLDetector(object):
         #   rospy.loginfo("TLDetector: next light id %s, light_wp id %s, car_wp_id %s, wp_len, cmp_result %s", next_id, self.stop_lights_wp_ids[next_id], self.last_wp_id, wp_len, cmp_result)
 
         light = self.lights[next_id] # shall we rely on the existence of this topic?
-        #rospy.loginfo("next_id %s, state %s, min_dist %s, cmp_result %s", next_id, state, min_dist, cmp_result)
+        #rospy.loginfo("next_id %s, state %s, min_dist %s, cmp_result %s last_min_dist %s", next_id, state, min_dist, cmp_result, last_min_dist)
         if state is not None and min_dist < SLOWDOWN_DIST and not cmp_result:  # publish -1 when still far away from the next light
             
             rospy.loginfo("TLDetector:: predicted %s, ground truth %s, next light id %s", LIGHTS_TABLE[state], LIGHTS_TABLE[light.state], next_id)

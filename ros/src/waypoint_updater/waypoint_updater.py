@@ -49,7 +49,7 @@ class WaypointUpdater(object):
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
    
-        rate = rospy.Rate(10) 
+        rate = rospy.Rate(12) 
         while not rospy.is_shutdown():
             self.update_waypoints()
             rate.sleep()
@@ -154,7 +154,7 @@ class WaypointUpdater(object):
                     target_v = 0.
                 else:
                     # Step by step decelaration
-                    target_v = car_vx * 0.75 * (dist / car_dist)
+                    target_v = car_vx * 0.7 * (dist / car_dist)
             self.set_waypoint_velocity(next_waypoints, i, target_v)
 
         # Construct a Lane message

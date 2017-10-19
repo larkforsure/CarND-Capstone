@@ -2,7 +2,7 @@ import rospy
 from pid import PID
 from lowpass import LowPassFilter
 from yaw_controller import YawController
-
+import sys
 
 class Controller(object):
     def __init__(self, wheel_base, steer_ratio, 
@@ -13,8 +13,8 @@ class Controller(object):
         self.accel_limit = accel_limit
         self.decel_limit = decel_limit
         self.max_steer_angle = max_steer_angle
-        self.throttle_pid = PID(2.5, 0.0, 0.0)
-        self.brake_pid = PID(9200.0, 20.0, 0.0)
+        self.throttle_pid = PID(4.0, 0.0001, 0.0)
+        self.brake_pid = PID(115.0, 20.0, 0.0)
         self.yaw_control = YawController(wheel_base, steer_ratio,
                         min_speed, max_lat_accel, max_steer_angle)
         self.filter = LowPassFilter(0.2, 0.1)
@@ -29,6 +29,7 @@ class Controller(object):
     dbw_enabled - drive by wire enabled (ignore error in this case)
     '''
     def control(self, target_v, target_w, current_v, dbw_enabled):
+        #rospy.loginfo("target_v %s, current_v %s", target_v.x, current_v.x)
         # TODO: Change the arg, kwarg list to suit your needs. Return throttle, brake, steer
         if self.last_timestamp is None or not dbw_enabled or target_v.x < 0.001:
             self.last_timestamp = rospy.get_time()
@@ -57,9 +58,14 @@ class Controller(object):
             self.brake_pid.reset()
             brake = 0.0
 
-        steering = self.yaw_control.get_steering(target_v.x, target_w.z, current_v.x)
-        steering = self.filter.filt(steering)
-        steering = min(max(steering, -3.), 3.)
+        # When brake, no steering
+        if error < 0:
+            self.filter.reset()
+            steering = 0.
+        else:
+            steering = self.yaw_control.get_steering(target_v.x, target_w.z, current_v.x)
+            steering = self.filter.filt(steering)
+            steering = min(max(steering, -1), 1)
         
         self.last_timestamp = rospy.get_time()
         
