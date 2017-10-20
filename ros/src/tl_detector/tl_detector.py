@@ -60,13 +60,14 @@ class TLDetector(object):
         self.last_state = TrafficLight.UNKNOWN
         self.last_light_wp_id = -1
 
-        sub6 = rospy.Subscriber('/image_color', Image, self.image_cb)#, queue_size=10, buff_size=1024*65536) 
+        sub6 = rospy.Subscriber('/image_color', Image, self.image_cb) 
         sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         
         rospy.loginfo("TL Detection : Initialization done");
+        rospy.loginfo("TL Detection : Good to go ~~~");
         sys.stdout.flush()
 
-        rate = rospy.Rate( 12) # The camera rate in yaml_to_camera_info_publisher is 10   
+        rate = rospy.Rate( 4) # The camera rate in yaml_to_camera_info_publisher is 10   
         while not rospy.is_shutdown():
             self.loop()
             rate.sleep()
@@ -81,10 +82,10 @@ class TLDetector(object):
         rospy.loginfo("TLDetector: Received base waypoints len %s, min_x %s, max_x %s", len(lane.waypoints), min([ wp.pose.pose.position.x for wp in lane.waypoints]), max([ wp.pose.pose.position.x for wp in lane.waypoints]));
         if self.waypoints is None:
             self.waypoints = lane.waypoints
+            # FIXME there's a large gap between loop begin & end
             # Tricky, duplicate waypoints to deal with wrap problem
             self.loop_waypoints = self.waypoints[:]
-            self.loop_waypoints.extend(self.loop_waypoints)
-
+            self.loop_waypoints.extend(self.loop_waypoints[:])
 
     def lights_cb(self, trafficLightArray):
         self.lights = trafficLightArray.lights
@@ -141,7 +142,7 @@ class TLDetector(object):
         #TODO implement
         min_dist = sys.maxsize
         next_id = None
-        for i in range(len(self.waypoints) - 1):
+        for i in range(len(self.waypoints)):
             wp_x = self.waypoints[i].pose.pose.position.x
             wp_y = self.waypoints[i].pose.pose.position.y
             dist = (pose.position.x - wp_x)**2 + (pose.position.y - wp_y)**2
@@ -199,7 +200,7 @@ class TLDetector(object):
         # Find the closest visible traffic light (if one exists)
         min_dist = sys.maxsize
         next_id = None
-        for i in range(len(stop_lights_positions)-1):
+        for i in range(len(stop_lights_positions)):
             # The last light position is totally worng, must map to wp_id, then caculate distance
             #wp_x = stop_lights_positions[i][0]
             #wp_y = stop_lights_positions[i][1]
@@ -221,7 +222,8 @@ class TLDetector(object):
         state = None
         if min_dist < 1.5 * SLOWDOWN_DIST: # We are still in moving during inference, so x2
             state = self.get_light_state()
-        #rospy.loginfo("min_dist %s, car_x %s, car_y %s, wp_x %s, wp_y %s, next_id %s", min_dist, car_x, car_y, wp_x, wp_y, next_id)
+        #if next_id == 6 or next_id == 7:
+        #    rospy.loginfo("min_dist %s, car_x %s, car_y %s, wp_x %s, wp_y %s, next_id %s", min_dist, car_x, car_y, wp_x, wp_y, next_id)
         last_min_dist = min_dist
 
         # After inference lag, do all the caculation again !!!
@@ -237,7 +239,7 @@ class TLDetector(object):
         end = wp_len # the first search shall be inside orignal waypoints
         if self.last_wp_id is not None:
             begin = max(0, self.last_wp_id - 2)
-            end = min(end * 2, self.last_wp_id + 8) # search extend to duplicated loop waypoints
+            end = min(len(self.loop_waypoints), self.last_wp_id + 8) # search extend to duplicated loop waypoints
 
         for i in range(begin, end):
             wp_x = self.loop_waypoints[i].pose.pose.position.x
@@ -255,7 +257,7 @@ class TLDetector(object):
         # Find the closest visible traffic light (if one exists)
         min_dist = sys.maxsize
         next_id = None
-        for i in range(len(stop_lights_positions)-1):
+        for i in range(len(stop_lights_positions)):
             #wp_x = stop_lights_positions[i][0]
             #wp_y = stop_lights_positions[i][1]
             wp_x = self.waypoints[self.stop_lights_wp_ids[i]].pose.pose.position.x
@@ -276,13 +278,13 @@ class TLDetector(object):
         # caes 2
         #is_car_wrap_2 = self.stop_lights_wp_ids[next_id] < 0.15 * wp_len \
         #                    and self.last_wp_id > 0.7 * wp_len
-        is_car_wrap_2 = (next_id == 0) and self.last_wp_id > self.stop_lights_wp_ids[-1]
+        is_car_wrap_2 = (next_id == 0) and self.last_wp_id >= self.stop_lights_wp_ids[-1]
         is_car_wrap = is_car_wrap_1 or is_car_wrap_2
         if is_car_wrap:
             rospy.loginfo("TLDetector: Car is wrapping the starting point, logic reversed")
 
-        # In these two cases, the decision logic shall be revsered
         cmp_result = self.stop_lights_wp_ids[next_id] <= self.last_wp_id
+        # In these two cases, the decision logic shall be revsered
         if is_car_wrap:
             cmp_result = not cmp_result
 
@@ -295,11 +297,11 @@ class TLDetector(object):
             # FIXME shall be road distance
             min_dist = (car_x - wp_x)**2 + (car_y - wp_y)**2
 
-        #if next_id == 7 or if next_id == 6:
-        #   rospy.loginfo("TLDetector: next light id %s, light_wp id %s, car_wp_id %s, wp_len, cmp_result %s", next_id, self.stop_lights_wp_ids[next_id], self.last_wp_id, wp_len, cmp_result)
+        #rospy.loginfo("TLDetector: next light id %s, light_wp id %s, car_wp_id %s, cmp_result %s", next_id, self.stop_lights_wp_ids[next_id], self.last_wp_id, cmp_result)
 
         light = self.lights[next_id] # shall we rely on the existence of this topic?
-        #rospy.loginfo("next_id %s, state %s, min_dist %s, cmp_result %s last_min_dist %s", next_id, state, min_dist, cmp_result, last_min_dist)
+        #if next_id == 6 or next_id == 7:
+        #    rospy.loginfo("next_id %s, state %s, min_dist %s, cmp_result %s last_min_dist %s", next_id, state, min_dist, cmp_result, last_min_dist)
         if state is not None and min_dist < SLOWDOWN_DIST and not cmp_result:  # publish -1 when still far away from the next light
             
             rospy.loginfo("TLDetector:: predicted %s, ground truth %s, next light id %s", LIGHTS_TABLE[state], LIGHTS_TABLE[light.state], next_id)

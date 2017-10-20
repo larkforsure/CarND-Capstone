@@ -1,8 +1,13 @@
-![Alt text](./imgs/img1.png)
+[![Alt text](https://img.youtube.com/vi/VGfyyxPGRgY/0.jpg)](https://www.youtube.com/watch?v=VGfyyxPGRgY)
 
-Did this on my own, except the tranining model. Not I don't teamwork, my last team leader disappeared, left me 2 weeks to the dealine.
+Did this on my own, except the traninning model. Not I don't teamwork, my last team leader disappeared, left me with 2 weeks and nothing to the dealine.
 
-Test it and tune the parameters on VirutalBox. One of the biggest changellge is handling Inferencing introduced lag. These opmizations might not work on your envrioment if not with that VirutalBox image or if on a much better gear.
+Tested it and tuned the parameters on VirualtBox. The biggest challenge is handling Inference introduced lag with such poor computation power. Some lag compensention algorithms can work on other envrioments / platforms, some not, e.g. PID parameters.
+
+The car can handle wrapping the starting point problem
+
+
+
 
 This is the project repo for the final project of the Udacity Self-Driving Car Nanodegree: Programming a Real Self-Driving Car. For more information about the project, see the project introduction [here](https://classroom.udacity.com/nanodegrees/nd013/parts/6047fe34-d93c-4f50-8336-b70ef10cb4b2/modules/e1a23b06-329a-4684-a717-ad476f0d8dff/lessons/462c933d-9f24-42d3-8bdc-a08a5fc866e4/concepts/5ab4b122-83e6-436d-850f-9f4d26627fd9).
 

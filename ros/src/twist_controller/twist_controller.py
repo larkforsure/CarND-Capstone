@@ -13,8 +13,8 @@ class Controller(object):
         self.accel_limit = accel_limit
         self.decel_limit = decel_limit
         self.max_steer_angle = max_steer_angle
-        self.throttle_pid = PID(6.5, 0.00005, 0.0)
-        self.brake_pid = PID(350.0, 20.0, 0.0)
+        self.throttle_pid = PID(4.0, 0.0, 0.0)
+        self.brake_pid = PID(220.0, 20.0, 0.0)
         self.yaw_control = YawController(wheel_base, steer_ratio,
                         min_speed, max_lat_accel, max_steer_angle)
         self.filter = LowPassFilter(0.2, 0.1)
@@ -49,7 +49,7 @@ class Controller(object):
             self.throttle_pid.reset()
             self.brake_pid.reset()
             self.filter.reset()
-            return 0, 4400.0, 0
+            return 0, 5000.0, 0
   
 
         ### Only one of throttle & brake allowed to be non-Zero
@@ -76,7 +76,7 @@ class Controller(object):
         else:
             steering = self.yaw_control.get_steering(target_v.x, target_w.z, current_v.x)
             steering = self.filter.filt(steering)
-            steering = min(max(steering, -1), 1)
+            steering = min(max(steering, -7.), 7.)
         
         self.last_timestamp = rospy.get_time()
         

@@ -66,10 +66,10 @@ class WaypointUpdater(object):
         rospy.loginfo("WaypointUpdater: Received base waypoints len %s, min_x %s, max_x %s", len(lane.waypoints), min([ wp.pose.pose.position.x for wp in lane.waypoints]), max([ wp.pose.pose.position.x for wp in lane.waypoints]));
         if self.waypoints is None:
             self.waypoints = lane.waypoints
+            # FIXME there's a large gap between loop begin & end
             # Tricky, duplicate waypoints to deal with wrap problem
             self.loop_waypoints = self.waypoints[:]
-            self.loop_waypoints.extend(self.loop_waypoints)
-            #self.update_waypoints()
+            self.loop_waypoints.extend(self.loop_waypoints[:])
 
 
     def current_velocity_cb(self, twistStamped):
@@ -116,7 +116,7 @@ class WaypointUpdater(object):
         end = wp_len # the first search shall be inside orignal waypoints
         if self.last_wp_id is not None:
             begin = max(0, self.last_wp_id - 2)
-            end = min(end * 2, self.last_wp_id + 8) # search extend to duplicated loop waypoints
+            end = min(len(self.loop_waypoints), self.last_wp_id + 8) # search extend to duplicated loop waypoints
 
         for i in range(begin, end):
             wp_x = self.loop_waypoints[i].pose.pose.position.x
@@ -138,18 +138,16 @@ class WaypointUpdater(object):
         
         # Adjust next_waypoints velocity
         car_vx = self.current_velocity.twist.linear.x
-        car_dist = None
-        for i in range(len(next_waypoints)-1):
+        car_dist = self.distance(self.waypoints, self.last_wp_id, self.upcoming_red_light_wp_id)
+        for i in range(len(next_waypoints)):
             target_v = None
-            if self.upcoming_red_light_wp_id == -1 or self.last_wp_id == self.upcoming_red_light_wp_id: 
+            if self.upcoming_red_light_wp_id == -1 or car_dist < 1e-5: 
                 target_v = self.max_speed
             else:
                 last_wp_id_i = self.last_wp_id + i
                 last_wp_id_i = last_wp_id_i if last_wp_id_i < wp_len else last_wp_id_i - wp_len
                 # Distance along the road
                 dist = self.distance(self.waypoints, last_wp_id_i, self.upcoming_red_light_wp_id)
-                if i == 0:
-                    car_dist = dist
                 if dist < 6: 
                     target_v = 0.
                 else:
@@ -167,7 +165,7 @@ class WaypointUpdater(object):
     def get_closest_waypoint(self, pose):
         min_dist = sys.maxsize
         next_id = None
-        for i in range(len(self.waypoints) - 1):
+        for i in range(len(self.waypoints)):
             wp_x = self.waypoints[i].pose.pose.position.x
             wp_y = self.waypoints[i].pose.pose.position.y
             dist = (pose.position.x - wp_x)**2 + (pose.position.y - wp_y)**2
