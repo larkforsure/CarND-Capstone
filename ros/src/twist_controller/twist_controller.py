@@ -49,7 +49,7 @@ class Controller(object):
             self.throttle_pid.reset()
             self.brake_pid.reset()
             self.filter.reset()
-            return 0, 4500.0, 0
+            return 0, 4400.0, 0
   
 
         ### Only one of throttle & brake allowed to be non-Zero
