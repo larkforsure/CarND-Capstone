@@ -13,8 +13,8 @@ class Controller(object):
         self.accel_limit = accel_limit
         self.decel_limit = decel_limit
         self.max_steer_angle = max_steer_angle
-        self.throttle_pid = PID(4.0, 0.0001, 0.0)
-        self.brake_pid = PID(115.0, 20.0, 0.0)
+        self.throttle_pid = PID(6.5, 0.00005, 0.0)
+        self.brake_pid = PID(300.0, 20.0, 0.0)
         self.yaw_control = YawController(wheel_base, steer_ratio,
                         min_speed, max_lat_accel, max_steer_angle)
         self.filter = LowPassFilter(0.2, 0.1)
@@ -30,18 +30,29 @@ class Controller(object):
     '''
     def control(self, target_v, target_w, current_v, dbw_enabled):
         #rospy.loginfo("target_v %s, current_v %s", target_v.x, current_v.x)
+        
+        error = min(target_v.x, self.max_speed) - current_v.x
+        
         # TODO: Change the arg, kwarg list to suit your needs. Return throttle, brake, steer
-        if self.last_timestamp is None or not dbw_enabled or target_v.x < 0.001:
+        if self.last_timestamp is None or not dbw_enabled:
             self.last_timestamp = rospy.get_time()
             # Reset throttle PID, steer filter
             self.throttle_pid.reset()
             self.brake_pid.reset()
             self.filter.reset()
-            return 0., 3000., 0.
+            return 0., 0.1, 0.
+
+        # Car is stopped or approaching red light
+        if target_v.x < 1e-5:  # shall avoid very slow speed being recognized as stopping
+            self.last_timestamp = rospy.get_time()
+            # Reset throttle PID, steer filter
+            self.throttle_pid.reset()
+            self.brake_pid.reset()
+            self.filter.reset()
+            return 0, 4500.0, 0
   
 
         ### Only one of throttle & brake allowed to be non-Zero
-        error = min(target_v.x, self.max_speed) - current_v.x
         dt = rospy.get_time() - self.last_timestamp
         # braking
         if error < 0:

@@ -141,16 +141,16 @@ class WaypointUpdater(object):
         car_dist = None
         for i in range(len(next_waypoints)-1):
             target_v = None
-            if self.upcoming_red_light_wp_id == -1:
+            if self.upcoming_red_light_wp_id == -1 or self.last_wp_id == self.upcoming_red_light_wp_id: 
                 target_v = self.max_speed
             else:
                 last_wp_id_i = self.last_wp_id + i
                 last_wp_id_i = last_wp_id_i if last_wp_id_i < wp_len else last_wp_id_i - wp_len
                 # Distance along the road
-                dist = self.distance(self.waypoints, last_wp_id_i, self.upcoming_red_light_wp_id - 1)
+                dist = self.distance(self.waypoints, last_wp_id_i, self.upcoming_red_light_wp_id)
                 if i == 0:
                     car_dist = dist
-                if car_dist < 5 or dist < 5: # dist != 0 only when wp1_id < wp2_id
+                if dist < 6: 
                     target_v = 0.
                 else:
                     # Step by step decelaration
