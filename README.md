@@ -1,10 +1,10 @@
-[![Alt text](https://img.youtube.com/vi/VGfyyxPGRgY/0.jpg)](https://www.youtube.com/watch?v=VGfyyxPGRgY)
+[![Alt text](https://img.youtube.com/vi/j4H9qyK5wf8/0.jpg)](https://www.youtube.com/watch?v=j4H9qyK5wf8)
 
-Did this on my own, except the traninning model. Not I don't teamwork, my last team leader disappeared, left me with 2 weeks and nothing to the dealine.
+Did this on my own, Not I am not teamworking, my last team leader disappeared!!! Left me with 2 weeks and an empty deposit.
 
-Tested it and tuned the parameters on VirualtBox. The biggest challenge is handling Inference introduced lag with such poor computation power. Some lag compensention algorithms can work on other envrioments / platforms, some not, e.g. PID parameters.
+Tested it and tuned the parameters on VirualtBox. The biggest challenge is handling Inference introduced lag with poor computation power. Some lag compensention algorithms can work on others'(you reviewer's) envrioments / platforms, some might not. For example, have to use very low Rospy.rate, this will lead to smapling lag and even light signal loss. 
 
-The car can handle wrapping the starting point problem
+The car can handle wrapping the starting point problem, but need a powerful gear and increase the clocks and might be maxspeed
 
 
 

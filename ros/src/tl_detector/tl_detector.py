@@ -12,7 +12,7 @@ import numpy as np
 import yaml,math,sys
 
 STATE_COUNT_THRESHOLD = 1
-SLOWDOWN_DIST = 3600 # Dist**2 before next light to start slowing down / image detection
+DETECT_DIST = 3600 # Dist**2 before next light to start image detection
 LIGHTS_TABLE = ['RED', 'YELLOW', 'GREEN', 'N/A', 'UNKNOWN'] # refer to styx_msgs/msg/TrafficLight.msg
 
 class TLDetector(object):
@@ -116,6 +116,10 @@ class TLDetector(object):
         of times till we start using it. Otherwise the previous stable state is
         used.
         '''
+        # Hack Yellow as Red
+        #if state == TrafficLight.YELLOW:
+        #    state = TrafficLight.RED 
+        
         if self.state != state:
             self.state_count = 0
             self.state = state
@@ -220,7 +224,7 @@ class TLDetector(object):
 
         # Here is to minimize the inference caculation
         state = None
-        if min_dist < 1.5 * SLOWDOWN_DIST: # We are still in moving during inference, so x2
+        if min_dist < DETECT_DIST: # We are still in moving during inference, so x2
             state = self.get_light_state()
         #if next_id == 6 or next_id == 7:
         #    rospy.loginfo("min_dist %s, car_x %s, car_y %s, wp_x %s, wp_y %s, next_id %s", min_dist, car_x, car_y, wp_x, wp_y, next_id)
@@ -302,7 +306,7 @@ class TLDetector(object):
         light = self.lights[next_id] # shall we rely on the existence of this topic?
         #if next_id == 6 or next_id == 7:
         #    rospy.loginfo("next_id %s, state %s, min_dist %s, cmp_result %s last_min_dist %s", next_id, state, min_dist, cmp_result, last_min_dist)
-        if state is not None and min_dist < SLOWDOWN_DIST and not cmp_result:  # publish -1 when still far away from the next light
+        if state is not None and min_dist < DETECT_DIST and not cmp_result:  # publish -1 when still far away from the next light
             
             rospy.loginfo("TLDetector:: predicted %s, ground truth %s, next light id %s", LIGHTS_TABLE[state], LIGHTS_TABLE[light.state], next_id)
             sys.stdout.flush()

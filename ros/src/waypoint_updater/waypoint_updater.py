@@ -23,6 +23,7 @@ TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 
 LOOKAHEAD_WPS = 100 # Number of waypoints we will publish. You can change this number
+SLOWDOWN_DIST = 30
 
 class WaypointUpdater(object):
     def __init__(self):
@@ -148,11 +149,17 @@ class WaypointUpdater(object):
                 last_wp_id_i = last_wp_id_i if last_wp_id_i < wp_len else last_wp_id_i - wp_len
                 # Distance along the road
                 dist = self.distance(self.waypoints, last_wp_id_i, self.upcoming_red_light_wp_id)
-                if dist < 6: 
-                    target_v = 0.
+                low_bound = 0.5
+                up_bound = SLOWDOWN_DIST + low_bound
+                #rospy.loginfo("dist %s", dist)
+                #sys.stdout.flush()
+                if dist < low_bound:
+                    target_v = 0
+                elif dist < up_bound: 
+                    target_v = (self.max_speed / 4) * ((dist - low_bound) / (up_bound - low_bound))
                 else:
-                    # Step by step decelaration
-                    target_v = car_vx * 0.7 * (dist / car_dist)
+                    target_v = self.max_speed
+
             self.set_waypoint_velocity(next_waypoints, i, target_v)
 
         # Construct a Lane message
