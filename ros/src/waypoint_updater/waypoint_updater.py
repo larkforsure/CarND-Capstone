@@ -22,7 +22,7 @@ as well as to verify your TL classifier.
 TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 
-LOOKAHEAD_WPS = 100 # Number of waypoints we will publish. You can change this number
+LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this number
 SLOWDOWN_DIST = 30
 
 class WaypointUpdater(object):
@@ -153,7 +153,11 @@ class WaypointUpdater(object):
                 up_bound = SLOWDOWN_DIST + low_bound
                 #rospy.loginfo("dist %s", dist)
                 #sys.stdout.flush()
-                if dist < low_bound:
+                if car_dist < up_bound:  # What shall I do?
+                    target_v = self.get_waypoint_velocity(next_waypoints[i])
+                    if target_v > self.max_speed or target_v < 0:
+                        rospy.loginfo("WARNING, i %s, target_v %s", i, target_v)
+                elif dist < low_bound:
                     target_v = 0
                 elif dist < up_bound: 
                     target_v = (self.max_speed / 4) * ((dist - low_bound) / (up_bound - low_bound))

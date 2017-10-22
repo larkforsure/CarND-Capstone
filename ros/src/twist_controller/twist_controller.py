@@ -44,15 +44,14 @@ class Controller(object):
             self.filter.reset()
             return 0., 0., 0.
 
-        # Car is stopped
-        #if target_v.x < 1e-5: 
-        if not abs(target_v.x - self.max_speed) < 1e-5 and current_v.x < 1.0:
+        # Car is stopped or approaching stopped
+        if not abs(target_v.x - self.max_speed) < 1e-5 and current_v.x < 10:
             self.last_timestamp = rospy.get_time()
             # Reset throttle PID, steer filter
             self.throttle_pid.reset()
             self.brake_pid.reset()
             self.filter.reset()
-            return 0, 10.0, 0
+            return 0, 10000, 0
  
         
         error = min(target_v.x, self.max_speed) - current_v.x
@@ -63,7 +62,7 @@ class Controller(object):
             brake = self.brake_pid.step(-1.0 * error, dt)
             brake = max(1, brake)
             #rospy.loginfo("Controller: current_v_v %s, error %s, brake %s", current_v.x, error,  brake)
-            sys.stdout.flush()
+            #sys.stdout.flush()
             # Reset throttle PID
             self.throttle_pid.reset()
             throttle = 0.0

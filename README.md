@@ -1,10 +1,10 @@
-[![Alt text](https://img.youtube.com/vi/j4H9qyK5wf8/0.jpg)](https://www.youtube.com/watch?v=j4H9qyK5wf8)
+[![Alt text](https://img.youtube.com/vi/5fF8uMRlYpU/0.jpg)](https://www.youtube.com/watch?v=5fF8uMRlYpU)
 
 Did this on my own, Not I am not teamworking, my last team leader disappeared!!! Left me with 2 weeks and an empty deposit.
 
-Tested it and tuned the parameters on VirualtBox. The biggest challenge is handling Inference introduced lag with poor computation power. Some lag compensention algorithms can work on others'(you reviewer's) envrioments / platforms, some might not. For example, have to use very low Rospy.rate, this will lead to smapling lag and even light signal loss. 
+Tested it and tuned the parameters on VirualtBox. The biggest challenge is handling Inference introduced lag with poor computation power. Some lag compensention algorithms can work on others' envrioments / platforms, some might not. For example, have to use very low Rospy.rate, this will lead to sampling lag and even lights signal loss. Another concern is PID parameters for Brake which might also be affected by specific system.
 
-The car can handle wrapping the starting point problem, but need a powerful gear and increase the clocks and might be maxspeed
+The car can handle wrapping the starting point problem, even with Waypoints missing between the start and the end
 
 
 

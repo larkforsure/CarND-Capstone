@@ -48,7 +48,7 @@ class TLDetector(object):
 
         model_path = rospy.get_param('~model_path')
         rospy.loginfo("TLDetector: Model path %s", model_path)
-        sys.stdout.flush()
+        #sys.stdout.flush()
 
         self.bridge = CvBridge()
         self.light_classifier = TLClassifier(model_path)
