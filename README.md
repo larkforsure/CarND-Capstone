@@ -1,16 +1,19 @@
 ### Recorded Video, bad quality to avoid putting more lag to the system
 
-[![Alt text](https://img.youtube.com/vi/5fF8uMRlYpU/0.jpg)](https://www.youtube.com/watch?v=5fF8uMRlYpU)
+[![Simulator Version](https://img.youtube.com/vi/5fF8uMRlYpU/0.jpg)](https://www.youtube.com/watch?v=5fF8uMRlYpU)
+
 
 ### Some Words
 
 Did this on my own, Not I am not teamworking, my last team leader disappeared!!! Left me with 2 weeks and an empty deposit.
 
-Tested it and tuned the parameters on VirualtBox. The biggest challenge is handling Inference introduced lag with poor computation power. Some lag compensention algorithms can work on others' envrioments / platforms, some might not. For example, have to use very low Rospy.rate, this will lead to sampling lag and even lights signal loss. Another concern is PID parameters for Brake which might also be affected by specific system.
+Tested it and tuned the parameters on VirualtBox. The biggest challenge is handling Inference introduced lag with my poor compute power. Some lag compensention algorithms can work on others' envrioments / platforms, some might not. For example, have to use very low Rospy.rate, this leads to sampling lag and even light signals loss. Another concern is PID parameters for Brake which might also be affected by individual system.
 
-The car can handle wrapping the starting point problem, even with Waypoints missing between the start and the end
+1) Tested on rosbag, please wait for the project launch completion before launch rosbag. The recorded video shows large lag.  The command to show the rosbag camera: " rosrun image_view image_view image:=/image_color "
 
-PS. The reason the car doesn't stop precisly is also due to my lag gear, the instability forced me to leave some margin.  Also the margin would lead the car to miss the lights change if too close.  If had a GPU gear, you might try to increase the rospy.Rate, shorten the slowdown_dist, tune the PID parameters. It can stop precisly with these.  But the attempt to handle system lag was also interesting, at least for me :)
+2) The car can handle wrapping starting point problem, even there's some gap between Waypoints start and end, which presented by Udacity
+
+PS. The reason car doesn't stop precisly is due to my gear lag, the instability forced me to leave some margin when plan the stop.  Also the margin would lead the car to miss the lights change if it happens too close.  If had a GPU gear, you might try to increase the rospy.Rate, shorten the slowdown dist, tune the PID parameters. It shall stop precisly with these.  But the attempt to handle system lag was also interesting, at least for me :)
 
 ### End of Some Words
 
