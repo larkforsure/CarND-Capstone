@@ -10,6 +10,8 @@ Tested it and tuned the parameters on VirualtBox. The biggest challenge is handl
 
 The car can handle wrapping the starting point problem, even with Waypoints missing between the start and the end
 
+PS. The reason the car doesn't stop precisly is also due to my lag gear, the instability forced me to leave some margin.  Also the margin would lead the car to miss the lights change if too close.  If had a GPU gear, you might try to increase the rospy.Rate, shorten the slowdown_dist, tune the PID parameters. It can stop precisly with these.  But the attempt to handle system lag was also interesting, at least for me :)
+
 ### End of Some Words
 
 
