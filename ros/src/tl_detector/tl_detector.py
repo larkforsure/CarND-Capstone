@@ -11,7 +11,6 @@ import cv2
 import numpy as np
 import yaml,math,sys
 
-STATE_COUNT_THRESHOLD = 1
 DETECT_DIST = 3600 # Dist**2 before next light to start image detection
 LIGHTS_TABLE = ['RED', 'YELLOW', 'GREEN', 'N/A', 'UNKNOWN'] # refer to styx_msgs/msg/TrafficLight.msg
 
@@ -27,6 +26,7 @@ class TLDetector(object):
         self.lights = []
 
         self.sim_testing = bool(rospy.get_param("~sim_testing", True))
+        self.state_count_threshold = 1 if self.sim_testing else 3
 
         sub2 = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
 
@@ -55,7 +55,7 @@ class TLDetector(object):
         self.listener = tf.TransformListener()
 
         # Let the car stop in the very beginning
-        self.state_count = STATE_COUNT_THRESHOLD
+        self.state_count = self.state_count_threshold
         self.state = TrafficLight.RED 
         self.last_state = TrafficLight.UNKNOWN
         self.last_light_wp_id = -1
@@ -127,7 +127,7 @@ class TLDetector(object):
         if self.state != state:
             self.state_count = 0
             self.state = state
-        elif self.state_count >= STATE_COUNT_THRESHOLD:
+        elif self.state_count >= self.state_count_threshold:
             self.last_state = self.state
             light_wp_id = light_wp_id if state == TrafficLight.RED else -1
             self.last_light_wp_id = light_wp_id
